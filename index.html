@@ -1,0 +1,1126 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Leitor de Texto (OCR) — Total Civil</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap">
+<script src="https://cdn.jsdelivr.net/npm/exifr@7.1.3/dist/full.umd.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<style>
+:root{--bg:#F6F4EF;--surface:#FFFFFF;--ink:#0F1E33;--muted:#6B7689;--line:#E6E0D6;--orange:#FF6B1A;--blue:#12355F;--blue-2:#1E4E8C;
+  --ok:#166534;--ok-bg:#E9F7EE;--warn:#92400E;--warn-bg:#FFF7E0;--bad:#B42318;--bad-bg:#FDECEA;--info:#1E4E8C;--info-bg:#EAF1FB;
+  --disp:'Fraunces',Georgia,serif;--sans:'Plus Jakarta Sans',system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;color-scheme:light}
+*{box-sizing:border-box}[hidden]{display:none!important}
+body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.5 var(--sans)}
+button,input,select,textarea{font:inherit;color:inherit}a{color:var(--blue-2)}
+.topo{background:var(--blue);color:#fff;padding:14px max(16px,env(safe-area-inset-right)) 14px max(16px,env(safe-area-inset-left))}
+.topo-lin{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;max-width:1200px;margin:0 auto}
+.marca h1{font-family:var(--disp);font-size:22px;font-weight:800;margin:0;line-height:1.15}.marca .sub{font-size:12.5px;color:rgba(255,255,255,.75)}
+.tbt{background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.25);color:#fff;border-radius:6px;padding:6px 11px;font-size:12.5px;font-weight:600;text-decoration:none}
+main{max-width:1200px;margin:0 auto;padding:18px max(16px,env(safe-area-inset-right)) 80px max(16px,env(safe-area-inset-left))}
+.intro{color:var(--muted);margin:0 0 16px;max-width:80ch}
+.cartao{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:16px;margin-bottom:14px}
+.cartao h3{font-size:15px;margin:0 0 10px}
+.solta{border:2px dashed #cfc6b6;border-radius:12px;padding:24px;text-align:center;background:#fbfaf7}.solta.sobre{border-color:var(--orange);background:#fff4ec}
+.linha{display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end}
+.campo{display:flex;flex-direction:column;gap:4px;min-width:0}.campo label,.rot{font-size:12px;font-weight:700;color:var(--muted)}
+.campo input,.campo select{border:1px solid var(--line);border-radius:7px;padding:8px 10px;background:#fff;min-height:38px}
+.bt{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);background:#fff;border-radius:8px;padding:8px 13px;font-weight:700;font-size:13px;cursor:pointer;min-height:38px}
+.bt:hover{border-color:var(--blue-2)}.bt.pri{background:var(--orange);border-color:var(--orange);color:#fff}.bt.peq{padding:5px 9px;min-height:30px;font-size:12px}.bt[disabled]{opacity:.5;cursor:default}
+.bt:focus-visible{outline:2px solid var(--orange);outline-offset:2px}
+.opcoes{display:flex;flex-direction:column;gap:8px}
+.opcao{display:flex;gap:10px;align-items:flex-start;border:1px solid var(--line);border-radius:10px;padding:10px 12px;cursor:pointer;background:#fff}
+.opcao input{margin-top:3px;accent-color:var(--orange)}.opcao b{display:block}.opcao small{color:var(--muted)}
+.ajuda{font-size:12.5px;color:var(--muted);margin:6px 0 0}
+.barra-prog{height:8px;background:#ece7dd;border-radius:99px;overflow:hidden;margin-top:10px}.barra-prog i{display:block;height:100%;width:0;background:var(--orange);transition:width .2s}
+.msg{border-radius:8px;padding:10px 12px;font-size:13px;margin:10px 0}.msg.info{background:var(--info-bg);color:var(--info)}.msg.warn{background:var(--warn-bg);color:var(--warn)}.msg.ok{background:var(--ok-bg);color:var(--ok)}.msg.bad{background:var(--bad-bg);color:var(--bad)}
+.res{display:grid;grid-template-columns:220px minmax(0,1fr);gap:14px;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:12px;margin-bottom:12px}
+@media(max-width:700px){.res{grid-template-columns:1fr}}
+.res img{width:100%;border-radius:8px;cursor:zoom-in;display:block;background:#e9e5dc}
+.res .nome{font-weight:800;word-break:break-all}
+textarea.texto{width:100%;min-height:180px;border:1px solid var(--line);border-radius:8px;padding:8px 10px;font:13px/1.5 var(--sans);resize:vertical;background:#fff;margin-top:6px}
+textarea.texto:focus{outline:2px solid var(--blue-2);border-color:transparent}
+.geo{border:1px solid #c9dbf3;background:var(--info-bg);border-radius:10px;padding:10px 12px;margin-top:10px}.geo .t{font-weight:800;color:var(--info)}
+.chave{display:grid;grid-template-columns:110px minmax(0,1fr);gap:4px 10px;margin:8px 0}.chave .k{color:var(--muted);font-weight:700;font-size:12.5px}
+.pill{font-size:11.5px;font-weight:700;border-radius:99px;padding:2px 9px;background:#eef0f3;white-space:nowrap}.pill.ok{background:var(--ok-bg);color:var(--ok)}.pill.warn{background:var(--warn-bg);color:var(--warn)}.pill.bad{background:var(--bad-bg);color:var(--bad)}
+table.fontes{border-collapse:collapse;width:100%;font-size:12.5px}table.fontes th{text-align:left;background:#eef0f3;padding:5px 8px;font-size:11.5px}table.fontes td{border-top:1px solid var(--line);padding:5px 8px;vertical-align:top}
+details{margin-top:8px}details summary{cursor:pointer;font-weight:700;font-size:12.5px}
+pre{white-space:pre-wrap;word-break:break-word;background:#f7f5f0;border:1px solid var(--line);border-radius:8px;padding:8px;font-size:12px;max-height:260px;overflow:auto;margin:6px 0 0}
+#visor{position:fixed;inset:0;z-index:3000;background:rgba(10,15,25,.9);display:flex;align-items:center;justify-content:center;padding:16px;cursor:zoom-out}#visor img{max-width:100%;max-height:100%;border-radius:8px}
+#porta{position:fixed;inset:0;z-index:4000;background:var(--blue);display:flex;align-items:center;justify-content:center;padding:16px;overflow:auto}
+.porta-caixa{width:100%;max-width:440px;background:#fff;border-radius:14px;padding:22px}
+.porta-marca{font-size:11px;font-weight:800;letter-spacing:1.2px;text-transform:uppercase;color:var(--orange)}
+.porta-caixa h2{font-family:var(--disp);font-size:24px;margin:4px 0 6px}
+.porta-sub{color:var(--muted);font-size:13px;margin:0 0 12px}
+</style>
+</head>
+<body>
+<!-- ===== LOGIN (conta grátis do Total Civil) ===== -->
+<div id="porta" role="dialog" aria-modal="true" aria-labelledby="porta-tit">
+  <div class="porta-caixa">
+    <div class="porta-marca">Total Civil</div>
+    <h2 id="porta-tit">Leitor de Texto (OCR)</h2>
+    <p class="porta-sub">Grátis para quem tem cadastro no Total Civil. Entre com o mesmo e-mail e senha do site.</p>
+    <div id="porta-carregando" class="porta-sub">Conectando…</div>
+    <form id="porta-form" hidden>
+      <div class="campo"><label for="pt-email">E-mail</label><input id="pt-email" type="email" autocomplete="username" required></div>
+      <div class="campo" style="margin-top:10px"><label for="pt-senha">Senha</label><input id="pt-senha" type="password" autocomplete="current-password" required></div>
+      <button type="submit" class="bt pri" id="pt-entrar" style="width:100%;justify-content:center;margin-top:14px">Entrar</button>
+      <div class="linha" style="justify-content:space-between;margin-top:10px">
+        <button type="button" class="bt peq" id="pt-esqueci">Esqueci minha senha</button>
+        <a class="bt peq" href="https://totalcivil.com.br/" target="_blank" rel="noopener">Criar conta grátis no Total Civil</a>
+      </div>
+    </form>
+    <div id="porta-msg" class="msg" hidden></div>
+  </div>
+</div>
+<script type="module">
+/* Login próprio: o github.io não enxerga a sessão do totalcivil.com.br. Mesmo projeto Firebase (calculadora-dnit) e mesmo cadastro.
+   Regra: qualquer conta do Total Civil usa de graça; só não entra quem foi recusado pelo administrador. */
+const SDK = 'https://www.gstatic.com/firebasejs/12.19.0/';
+const CONFIG = {apiKey: 'AIzaSyDZyUlkiGAOhe4NP7PX_jaaJzcS98tldDo', authDomain: 'calculadora-dnit.firebaseapp.com', projectId: 'calculadora-dnit',
+  storageBucket: 'calculadora-dnit.firebasestorage.app', messagingSenderId: '1003742612156', appId: '1:1003742612156:web:7e27813b90a16bea715eb9'};
+const el = id => document.getElementById(id);
+const msg = (t, tipo) => { const m = el('porta-msg'); m.hidden = !t; m.className = 'msg ' + (tipo || 'bad'); m.textContent = t || ''; };
+const prazo = (p, ms) => Promise.race([p, new Promise((_, r) => setTimeout(() => r(new Error('tempo')), ms))]);
+const ERROS = {'auth/invalid-credential': 'E-mail ou senha incorretos.', 'auth/wrong-password': 'E-mail ou senha incorretos.', 'auth/user-not-found': 'E-mail não cadastrado. Crie sua conta grátis no Total Civil.',
+  'auth/invalid-email': 'E-mail inválido.', 'auth/too-many-requests': 'Muitas tentativas. Espere alguns minutos e tente de novo.', 'auth/network-request-failed': 'Sem conexão com a internet.',
+  'auth/unauthorized-domain': 'Este endereço ainda não foi autorizado no Firebase do Total Civil (administrador: Authentication › Configurações › Domínios autorizados).'};
+const traduz = e => ERROS[e && e.code] || (/referer|referrer/i.test((e && e.message) || '') ? 'O endereço deste programa ainda não foi autorizado na chave do Firebase do Total Civil (administrador).' : ((e && e.message) || 'Não foi possível entrar.'));
+try{
+  const [{initializeApp}, A, F] = await prazo(Promise.all([import(SDK + 'firebase-app.js'), import(SDK + 'firebase-auth.js'), import(SDK + 'firebase-firestore.js')]), 20000);
+  const app = initializeApp(CONFIG), auth = A.getAuth(app), db = F.getFirestore(app);
+  el('porta-carregando').hidden = true;
+  A.onAuthStateChanged(auth, async u => {
+    if(!u){ el('porta').hidden = false; el('porta-form').hidden = false; el('tc-sair').hidden = true; el('tc-usuario').textContent = ''; return; }
+    el('porta-form').hidden = true; el('porta-carregando').hidden = false; el('porta-carregando').textContent = 'Conferindo o cadastro…';
+    let p = null;
+    try{ const s = await prazo(F.getDoc(F.doc(db, 'usuarios', u.uid)), 15000); p = s.exists() ? s.data() : null; }catch(e){ console.warn('cadastro:', e); }
+    el('porta-carregando').hidden = true;
+    if(p && p.recusado === true){ await A.signOut(auth); msg('Seu acesso foi recusado pelo administrador do Total Civil. Entre em contato pelo site.'); return; }
+    msg(''); el('porta').hidden = true;
+    el('tc-usuario').textContent = (p && p.nome) ? p.nome : u.email; el('tc-sair').hidden = false;
+  });
+  el('porta-form').addEventListener('submit', async ev => {
+    ev.preventDefault(); msg(''); const b = el('pt-entrar'); b.disabled = true;
+    try{ await prazo(A.signInWithEmailAndPassword(auth, el('pt-email').value.trim(), el('pt-senha').value), 20000); }
+    catch(e){ msg(e.message === 'tempo' ? 'O servidor demorou a responder. Tente de novo.' : traduz(e)); }
+    finally{ b.disabled = false; }
+  });
+  el('pt-esqueci').onclick = async () => {
+    const email = el('pt-email').value.trim(); if(!email){ msg('Escreva o seu e-mail e clique de novo em “Esqueci minha senha”.', 'warn'); return; }
+    try{ await A.sendPasswordResetEmail(auth, email); msg('Se o e-mail estiver cadastrado, você vai receber um link para criar nova senha.', 'ok'); }catch(e){ msg(traduz(e)); }
+  };
+  el('tc-sair').onclick = () => A.signOut(auth);
+}catch(e){
+  console.error(e); el('porta-carregando').hidden = true;
+  msg('Não foi possível conectar ao Total Civil para conferir o login (internet bloqueada?). Recarregue a página para tentar de novo.');
+}
+</script>
+<header class="topo"><div class="topo-lin">
+  <div class="marca"><h1>Leitor de Texto (OCR)</h1><div class="sub">Converte o texto das imagens em texto editável · reconhece coordenadas e endereços para o Google Earth</div></div>
+  <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><span id="tc-usuario" style="font-size:12.5px;color:rgba(255,255,255,.8)"></span><button type="button" class="tbt" id="tc-sair" hidden>Sair</button><a class="tbt" href="https://totalcivil.com.br/">Total Civil</a></div>
+</div></header>
+<main>
+<p class="intro">Anexe imagens (documentos fotografados, prints, placas, fotos de campo com tarja). O programa lê <b>todo o texto</b> de cada imagem e coloca numa caixa de texto que você pode <b>editar, copiar e baixar</b>.
+Se a imagem tiver <b>coordenadas ou endereço</b> (tarja do Timemark, GPS Map Camera, GPS gravado na foto, nome do arquivo), ele mostra o que achou e pergunta se você quer <b>georreferenciar no Google Earth</b>.
+Tudo é lido aqui no seu computador: as imagens não são enviadas para nenhum servidor.</p>
+
+<div class="cartao">
+  <div class="solta" id="solta">
+    <button type="button" class="bt pri" id="bt-anexar">📎 Anexar imagens</button>
+    <p class="ajuda">ou arraste as imagens para cá, ou cole um print com Ctrl+V · JPG, PNG ou WEBP</p>
+    <input type="file" id="in-img" accept="image/*" multiple hidden>
+  </div>
+  <div class="linha" style="margin-top:14px">
+    <div class="opcoes" style="flex:2;min-width:280px">
+      <span class="rot">Opções de leitura</span>
+      <label class="opcao"><input type="checkbox" id="op-geo" checked><span><b>Procurar coordenadas, endereço e data (fotos de campo)</b><small>Além do texto completo, lê a tarja da foto pelas três fontes: o arquivo (nome e propriedades/GPS), a tarja (cantos e faixas, várias leituras e votação) e a 2ª leitura (recortes à esquerda e no meio, coordenadas em graus com símbolos perdidos). Desmarque para documentos: fica mais rápido.</small></span></label>
+      <label class="opcao"><input type="checkbox" id="op-sempre"><span><b>Fazer sempre a 2ª leitura da tarja</b><small>Mesmo quando a 1ª já achou a coordenada (para conferir). Mais lento.</small></span></label>
+    </div>
+    <div class="opcoes" style="flex:1;min-width:220px">
+      <span class="rot">Região de referência</span>
+      <div class="campo"><label for="ref-lat">Latitude</label><input id="ref-lat" value="-22.527" inputmode="decimal"></div>
+      <div class="campo"><label for="ref-lon">Longitude</label><input id="ref-lon" value="-41.945" inputmode="decimal"></div>
+      <p class="ajuda" style="margin:0">Padrão: Rio das Ostras. Serve para completar coordenadas com símbolos perdidos e avisar quando uma leitura cai longe (mais de 50 km).</p>
+    </div>
+  </div>
+  <div class="linha" style="margin-top:12px">
+    <button type="button" class="bt pri" id="bt-ler" disabled>🔎 Ler as imagens</button>
+    <button type="button" class="bt" id="bt-parar" hidden>Parar</button>
+    <button type="button" class="bt" id="bt-txt" disabled>⬇ Baixar todos os textos (TXT)</button>
+    <button type="button" class="bt" id="bt-csv" disabled>⬇ Planilha (CSV)</button>
+    <button type="button" class="bt" id="bt-limpar">Limpar</button>
+  </div>
+  <div class="barra-prog" id="prog" hidden><i></i></div>
+  <p class="ajuda" id="status"></p>
+</div>
+<div class="cartao" id="geo-cartao" hidden>
+  <h3>🌍 Georreferenciar no Google Earth</h3>
+  <p class="ajuda" style="margin-top:0" id="geo-txt"></p>
+  <div class="linha" style="margin-top:8px"><div class="campo" style="flex:1;min-width:200px"><label for="kmz-nome">Nome da pasta no Google Earth</label><input id="kmz-nome" value="Leitura OCR"></div>
+  <button type="button" class="bt pri" id="bt-kmz">⬇ Gerar KMZ (imagens marcadas)</button>
+  <a class="bt" href="https://earth.google.com/web/" target="_blank" rel="noopener">Abrir o Google Earth Web</a></div>
+  <p class="ajuda">No Google Earth Web: <b>+ Novo › Importar arquivo KML</b> e escolha o KMZ. Cada imagem vira um ponto com a foto e o texto lido.</p>
+</div>
+<div id="lista"></div>
+</main>
+<div id="visor" hidden><img alt=""></div>
+
+<script>
+/* ===== MOTOR DE LEITURA — copiado SEM ALTERAÇÃO do Imagens GoogleEarth (repositório totalcivil-site, googleearth/index.html, versão GE-20). Corrigir lá e copiar de novo. ===== */
+const $ = id => document.getElementById(id);
+const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+let S = {cfg: {mun: ''}, fotos: [], marc: []};
+const BLOBS = new Map();
+function salvar(){} function renderFotos(){} function aviso(t){ console.info(t); }
+async function ocrFotos(){}   // não usado aqui (o motor do GE-03 embrulha esta função)
+function aviso(t, ms){ const a = $('aviso'); a.textContent = t; a.classList.add('on'); clearTimeout(aviso._t); aviso._t = setTimeout(() => a.classList.remove('on'), ms || 3200); }
+function novoId(p){ return (p || 'f') + Date.now().toString(36) + Math.random().toString(36).slice(2, 7); }
+function semAcento(s){ return String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, ''); }
+function slug(s){ return semAcento(s).replace(/[^A-Za-z0-9]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 50) || 'foto'; }
+function fmtData(iso){ if(!iso) return ''; const d = new Date(iso); return isNaN(d) ? '' : d.toLocaleDateString('pt-BR') + ' ' + d.toLocaleTimeString('pt-BR', {hour:'2-digit', minute:'2-digit'}); }
+function fmtHora(iso){ const d = new Date(iso); return isNaN(d) ? '' : d.toLocaleTimeString('pt-BR', {hour:'2-digit', minute:'2-digit'}); }
+function isoLocal(iso){ if(!iso) return ''; const d = new Date(iso); if(isNaN(d)) return ''; const p = n => String(n).padStart(2, '0'); return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()) + 'T' + p(d.getHours()) + ':' + p(d.getMinutes()); }
+function temLocal(f){ return typeof f.lat === 'number' && typeof f.lon === 'number' && isFinite(f.lat) && isFinite(f.lon); }
+function origemDe(f){ return temLocal(f) ? (f.orig || 'manual') : 'sem'; }
+function fotoPorId(id){ return S.fotos.find(f => f.id === id); }
+function marcDaFoto(id){ return S.marc.find(m => m.fotos.includes(id)); }
+const espera = ms => new Promise(r => setTimeout(r, ms));
+function progresso(elId, frac){ const b = $(elId); if(frac == null){ b.hidden = true; return; } b.hidden = false; b.firstElementChild.style.width = Math.round(Math.max(0, Math.min(1, frac)) * 100) + '%'; }
+function kb(n){ return n > 1048576 ? (n / 1048576).toFixed(1).replace('.', ',') + ' MB' : Math.max(1, Math.round(n / 1024)) + ' KB'; }
+
+
+/* ---------- coordenadas: decimal ou graus/minutos/segundos ---------- */
+function numBR(s){ return parseFloat(String(s).replace(',', '.')); }
+function lerCoordenadas(txt){
+  const t = String(txt || '').replace(/[’′]/g, "'").replace(/[”″]/g, '"').replace(/º/g, '°');
+  // link do Google Earth / Google Maps colado: .../@-22.55,-41.97,... ou !3d..!4d.. ou ?q=lat,lon
+  if(/google\.|goo\.gl|maps\.app/i.test(t)){
+    const u = t.match(/@(-?\d{1,2}\.\d+),(-?\d{1,3}\.\d+)/) || t.match(/!3d(-?\d{1,2}\.\d+)!4d(-?\d{1,3}\.\d+)/) || t.match(/[?&](?:q|ll|query)=(-?\d{1,2}\.\d+)(?:,|%2C)(-?\d{1,3}\.\d+)/i);
+    if(u){ const v = valida(+u[1], +u[2]); if(v) return v; }
+  }
+  // 22°33'2,67"S 41°58'27,606"W
+  let m = t.match(/(\d{1,2})\s*°\s*(\d{1,2})\s*'\s*(\d{1,2}(?:[.,]\d+)?)\s*"?\s*([NS])[\s,;]*(\d{1,3})\s*°\s*(\d{1,2})\s*'\s*(\d{1,2}(?:[.,]\d+)?)\s*"?\s*([EWOL])/i);
+  if(m){
+    let lat = +m[1] + +m[2] / 60 + numBR(m[3]) / 3600, lon = +m[5] + +m[6] / 60 + numBR(m[7]) / 3600;
+    if(/s/i.test(m[4])) lat = -lat; if(/[wo]/i.test(m[8])) lon = -lon;
+    return valida(lat, lon);
+  }
+  // 22°33.044'S 41°58.460'W
+  m = t.match(/(\d{1,2})\s*°\s*(\d{1,2}[.,]\d+)\s*'\s*([NS])[\s,;]*(\d{1,3})\s*°\s*(\d{1,2}[.,]\d+)\s*'\s*([EWOL])/i);
+  if(m){
+    let lat = +m[1] + numBR(m[2]) / 60, lon = +m[4] + numBR(m[5]) / 60;
+    if(/s/i.test(m[3])) lat = -lat; if(/[wo]/i.test(m[6])) lon = -lon;
+    return valida(lat, lon);
+  }
+  // leitura por OCR: aspas perdidas e hemisfério confundido (S lido como 8, 5 ou $); só vale para o Brasil (sul/oeste)
+  m = t.match(/(\d{1,2})\s*[°º*]\s*(\d{1,2})\s*['`]?\s+(\d{1,2}(?:[.,]\d+)?)\s*["']?\s*([NS85$])?[\s,;]+(\d{1,3})\s*[°º*]\s*(\d{1,2})\s*['`]?\s+(\d{1,2}(?:[.,]\d+)?)\s*["']?\s*(?:([EWOL])|VV|vv)/);
+  if(m){
+    let lat = +m[1] + +m[2] / 60 + numBR(m[3]) / 3600, lon = +m[5] + +m[6] / 60 + numBR(m[7]) / 3600;
+    if(!(m[4] && /N/.test(m[4]))) lat = -lat; if(!(m[8] && /[EL]/.test(m[8]))) lon = -lon;
+    const v = valida(lat, lon); if(v && lat < -15 && lat > -30 && lon < -35 && lon > -55) return v;
+  }
+  // -22.550742, -41.974335   ou   Lat -22,5507 Long -41,9743
+  m = t.match(/(-?\d{1,2}[.,]\d{3,})\s*°?\s*([NS])?[\s,;]+(?:long?\w*\s*:?\s*)?(-?\d{1,3}[.,]\d{3,})\s*°?\s*([EWOL])?/i);
+  if(m){
+    let lat = numBR(m[1]), lon = numBR(m[3]);
+    if(m[2] && /s/i.test(m[2]) && lat > 0) lat = -lat; if(m[4] && /[wo]/i.test(m[4]) && lon > 0) lon = -lon;
+    return valida(lat, lon);
+  }
+  return null;
+}
+function valida(lat, lon){ return (isFinite(lat) && isFinite(lon) && Math.abs(lat) <= 90 && Math.abs(lon) <= 180 && !(lat === 0 && lon === 0)) ? corrigeHemisferio(lat, lon) : null; }
+/* As coordenadas são a forma principal de localizar. Quando o sinal (S/W) se perde — tarja lida sem a letra,
+   EXIF sem a referência, número digitado sem o "-" — o ponto cai na Ásia ou na África.
+   Se o ponto estiver fora do Brasil e trocando o sinal ele cair no Brasil, usa o sinal certo. */
+const BRASIL = {latMin: -34.5, latMax: 5.5, lonMin: -74.5, lonMax: -32};
+const REF_PADRAO = {lat: -22.527, lon: -41.945};   // Rio das Ostras
+function noBrasil(lat, lon){ return lat >= BRASIL.latMin && lat <= BRASIL.latMax && lon >= BRASIL.lonMin && lon <= BRASIL.lonMax; }
+function refLocal(){
+  try{ const g = (S.fotos || []).filter(f => f.orig === 'gps' && f.lat != null && noBrasil(f.lat, f.lon)); if(g.length){ const ord = a => a.slice().sort((x, y) => x - y)[Math.floor(a.length / 2)]; return {lat: ord(g.map(f => f.lat)), lon: ord(g.map(f => f.lon))}; } }catch(e){}
+  return REF_PADRAO;
+}
+function corrigeHemisferio(lat, lon){
+  if(noBrasil(lat, lon)) return {lat, lon};
+  const ref = refLocal(), d = (a, b) => Math.hypot(a - ref.lat, (b - ref.lon) * Math.cos(ref.lat * Math.PI / 180));
+  const cands = [[-Math.abs(lat), -Math.abs(lon)], [lat, -Math.abs(lon)], [-Math.abs(lat), lon], [-lat, -lon]].filter(c => noBrasil(c[0], c[1]));
+  if(!cands.length) return {lat, lon};
+  cands.sort((a, b) => d(a[0], a[1]) - d(b[0], b[1]));
+  return {lat: cands[0][0], lon: cands[0][1], corrigido: true};
+}
+
+/* ---------- texto da tarja: data, endereço ---------- */
+const MESES = {jan:0, fev:1, mar:2, abr:3, mai:4, jun:5, jul:6, ago:7, set:8, out:9, nov:10, dez:11};
+function lerDataTarja(t){
+  const s = semAcento(t).toLowerCase();
+  let m = s.match(/(\d{1,2})\s*(?:de\s*)?(jan|fev|mar|abr|mai|jun|jul|ago|set|out|nov|dez)[a-z]*\.?\s*(?:de\s*)?(\d{4})[,\s]*(\d{1,2})[:h](\d{2})(?::(\d{2}))?/);
+  if(m) return new Date(+m[3], MESES[m[2]], +m[1], +m[4], +m[5], +(m[6] || 0)).toISOString();
+  m = s.match(/(\d{1,2})[\/.-](\d{1,2})[\/.-](\d{4})[,\s]*(\d{1,2}):(\d{2})(?::(\d{2}))?/);
+  if(m) return new Date(+m[3], +m[2] - 1, +m[1], +m[4], +m[5], +(m[6] || 0)).toISOString();
+  // Timemark: "11:02 | 03 nov. 2026"
+  m = s.match(/(\d{1,2}):(\d{2})[\s|]+(\d{1,2})\s*(jan|fev|mar|abr|mai|jun|jul|ago|set|out|nov|dez)[a-z]*\.?\s*(\d{4})/);
+  if(m) return new Date(+m[5], MESES[m[4]], +m[3], +m[1], +m[2]).toISOString();
+  return '';
+}
+const TIPO_RUA = '(?:Rua|R\\.|Avenida|Av\\.?|Alameda|Al\\.|Travessa|Tv\\.|Estrada|Estr\\.|Rodovia|Rod\\.|Pra[çc]a|Largo|Servid[aã]o|Beco|Via|Viela|Ladeira|Caminho)';
+function lerEnderecoTarja(t){
+  const linhas = String(t || '').split(/\n+/).map(x => x.replace(/\s+/g, ' ').trim()).filter(Boolean);
+  const re = new RegExp('(\\d+\\s+)?(' + TIPO_RUA + '\\s+(?:(?! - )[^,\\n|]){2,60})(?:,\\s*(\\d{1,5})\\b)?', 'i');
+  const naoBairro = /^\d|^(lt|qd|lote|quadra|casa|apto?|bloco)\b|rio das ostras|\brj\b|brasil|rio de janeiro|\d{5}-?\d{3}/i;
+  // várias linhas podem ter nome de rua (o mini-mapa do canto da foto traz "R. Trinta", "R. José…");
+  // escolhe a linha que parece endereço da tarja: tipo por extenso, com número, bairro ou cidade
+  let melhor = -1, nota = -99;
+  linhas.forEach((l, i) => {
+    const m = l.match(re); if(!m) return;
+    let p = 0;
+    if(/^(rua|avenida|alameda|travessa|estrada|rodovia|pra[çc]a|largo|servid[aã]o|beco|via|viela|ladeira|caminho)\b/i.test(m[2])) p += 2; else p -= 3;
+    if(m[3] || m[1]) p += 2;
+    if(/,|\s-\s/.test(l.slice(m.index + m[0].length))) p += 1;
+    if(/rio das ostras|\brj\b|\d{5}-?\d{3}/i.test(l + ' ' + (linhas[i + 1] || ''))) p += 2;
+    if(m[2].length < 9) p -= 1;
+    if(p > nota){ nota = p; melhor = i; }
+  });
+  for(let i = melhor; i >= 0 && i < linhas.length; i = -1){
+    const m = linhas[i].match(re);
+    if(!m) continue;
+    let rua = m[2].replace(/\s+\d{5}-?\d{3}.*$/, '').replace(/\s+(Rio das Ostras|RJ|Brasil).*$/i, '').trim();
+    rua = rua.replace(/\s+\d+$/, '');
+    const num = (m[3] || (m[1] || '').trim() || '').trim();
+    const cep = (t.match(/\b(\d{5})-?(\d{3})\b/) || [])[0] || '';
+    let bairro = '';
+    const tr = linhas[i].slice(m.index + m[0].length).replace(/^\s*-\s*/, ', ');
+    const cand = tr.split(',').map(x => x.trim()).filter(x => x && !naoBairro.test(x));
+    if(cand.length) bairro = cand[0];
+    else if(linhas[i + 1] && !/\d{3}/.test(linhas[i + 1]) && !naoBairro.test(linhas[i + 1])) bairro = linhas[i + 1];
+    return {rua, num, bairro, cep, texto: [rua + (num ? ', ' + num : ''), bairro].filter(Boolean).join(' - ')};
+  }
+  return null;
+}
+
+/* ============================================================
+   ARMAZENAMENTO LOCAL (IndexedDB): estado + fotos originais
+   ============================================================ */
+async function miniatura(blob, lado){
+  const bmp = await abrirImagem(blob);
+  const k = Math.min(1, lado / Math.max(bmp.width, bmp.height));
+  const c = document.createElement('canvas'); c.width = Math.round(bmp.width * k); c.height = Math.round(bmp.height * k);
+  c.getContext('2d').drawImage(bmp, 0, 0, c.width, c.height);
+  const w = bmp.width, h = bmp.height; if(bmp.close) bmp.close();
+  return {url: c.toDataURL('image/jpeg', .72), w, h};
+}
+const MSG_ILEGIVEL = 'o arquivo original da foto não pode mais ser lido (foi movido, apagado ou alterado depois de anexado)';
+async function abrirImagem(blob){
+  try{ return await createImageBitmap(blob, {imageOrientation: 'from-image'}); }
+  catch(_){
+    try{ return await createImageBitmap(blob); }
+    catch(e){
+      // antes de culpar o formato, confere se o arquivo ainda pode ser lido (original movido, apagado ou alterado depois de anexado)
+      try{ await blob.slice(0, 16).arrayBuffer(); }catch(e2){ throw new Error(MSG_ILEGIVEL); }
+      return await new Promise((ok, erro) => { const u = URL.createObjectURL(blob), i = new Image(); i.onload = () => { URL.revokeObjectURL(u); ok(i); }; i.onerror = () => { URL.revokeObjectURL(u); erro(new Error('formato de imagem não suportado')); }; i.src = u; });
+    }
+  }
+}
+async function reduzir(blob, maxPx, q){
+  if(!maxPx && /jpe?g/i.test(blob.type || '')){
+    try{ return new Blob([await blob.arrayBuffer()], {type: blob.type}); }catch(e){ throw new Error(MSG_ILEGIVEL); }
+  }
+  const bmp = await abrirImagem(blob);
+  let w = bmp.width, h = bmp.height;
+  if(maxPx && Math.max(w, h) > maxPx){ const k = maxPx / Math.max(w, h); w = Math.round(w * k); h = Math.round(h * k); }
+  const c = document.createElement('canvas'); c.width = w; c.height = h;
+  const g = c.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, w, h); g.drawImage(bmp, 0, 0, w, h);
+  if(bmp.close) bmp.close();
+  return await new Promise(ok => c.toBlob(ok, 'image/jpeg', q));
+}
+function textoProp(v){
+  if(v == null) return '';
+  if(typeof v === 'string') return v.replace(/\u0000/g, '').trim();
+  if(Array.isArray(v)) return v.map(textoProp).filter(Boolean).join('; ');
+  if(v instanceof Uint8Array){   // UserComment: 8 bytes de código de caracteres + texto
+    let b = v; if(b.length > 8 && /^(ASCII|UNICODE|JIS)/.test(String.fromCharCode.apply(null, b.slice(0, 5)))) b = b.slice(8);
+    try{ return new TextDecoder(v[0] === 0x55 ? 'utf-16be' : 'utf-8').decode(b).replace(/\u0000/g, '').trim(); }catch(e){ return ''; }
+  }
+  if(typeof v === 'object'){ if(v.value != null) return textoProp(v.value); if(v['#value'] != null) return textoProp(v['#value']); if(v.en != null) return textoProp(v.en); return Object.keys(v).map(k => textoProp(v[k])).filter(Boolean).join('; '); }
+  return String(v).trim();
+}
+const CAMPOS_PROP = [['titulo', ['XPTitle', 'title', 'Title', 'ObjectName', 'Headline']], ['assunto', ['XPSubject', 'subject', 'Subject']], ['comentario', ['XPComment', 'UserComment', 'Comment']],
+  ['descricao', ['ImageDescription', 'description', 'Description', 'Caption', 'Caption-Abstract']], ['palavras', ['XPKeywords', 'Keywords', 'keywords']], ['autor', ['XPAuthor', 'Artist', 'creator']],
+  ['local', ['Location', 'SubLocation', 'City', 'Sub-location', 'Province-State', 'Country-PrimaryLocationName']], ['camera', ['Make', 'Model']], ['programa', ['Software']]];
+function gpsXmp(lat, lon){   // XMP grava "22,33.044S"
+  const f = (t, neg) => { const m = String(t || '').match(/^\s*(\d+)[,:\s]+(\d+(?:\.\d+)?)(?:[,:\s]+(\d+(?:\.\d+)?))?\s*([NSEWOL])?\s*$/i); if(!m) { const n = numBR(t); return isFinite(n) ? n : NaN; } let v = +m[1] + numBR(m[2]) / 60 + (m[3] ? numBR(m[3]) / 3600 : 0); if(m[4] && /[SWO]/i.test(m[4])) v = -v; return v; };
+  return valida(f(lat), f(lon));
+}
+async function lerExif(file){
+  const r = {props: {}};
+  if(typeof exifr === 'undefined') return r;
+  let o = null;
+  try{ o = await exifr.parse(file, {tiff: true, ifd0: true, exif: true, gps: true, xmp: true, iptc: true, icc: false, jfif: false, mergeOutput: true, translateKeys: true, reviveValues: true}); }
+  catch(e){ try{ o = await exifr.parse(file, {tiff: true, exif: true, gps: true}); }catch(e2){ o = null; } }
+  if(!o) return r;
+  if(typeof o.latitude === 'number' && typeof o.longitude === 'number'){ const v = valida(o.latitude, o.longitude); if(v){ r.lat = v.lat; r.lon = v.lon; r.via = 'gps'; } }
+  const d = o.DateTimeOriginal || o.CreateDate || o.ModifyDate;
+  if(d instanceof Date && !isNaN(d)) r.data = d.toISOString();
+  // propriedades de texto do arquivo (Windows: Detalhes › Título, Assunto, Comentários, Marcas…)
+  CAMPOS_PROP.forEach(([k, nomes]) => { const t = nomes.map(n => textoProp(o[n])).filter(Boolean).filter((x, i, a) => a.indexOf(x) === i).join(' · ').slice(0, 400); if(t) r.props[k] = t; });
+  // coordenada fora dos campos de GPS: XMP ou escrita no texto das propriedades
+  if(r.lat == null){
+    const lx = o.GPSLatitude, ly = o.GPSLongitude;
+    if(typeof lx === 'string' && typeof ly === 'string'){ const v = gpsXmp(lx, ly); if(v){ r.lat = v.lat; r.lon = v.lon; r.via = 'prop'; } }
+  }
+  if(r.lat == null){
+    const todos = Object.keys(r.props).filter(k => k !== 'camera' && k !== 'programa').map(k => r.props[k]);
+    for(const t of todos.concat([todos.join(' | ')])){ const c = lerCoordenadas(t); if(c){ r.lat = c.lat; r.lon = c.lon; r.via = 'prop'; break; } }
+  }
+  return r;
+}
+let _ocr = null;
+/* GE-17: o leitor (Tesseract.js + núcleo + português) fica na pasta ocr/ do próprio site: carrega mais rápido, o navegador guarda para as
+   próximas vezes e não depende de servidor de terceiros. Se a cópia do site não carregar, volta a baixar da internet como antes. */
+function carregarScript(src){ return new Promise((ok, erro) => { const s = document.createElement('script'); s.src = src; s.onload = ok; s.onerror = () => { s.remove(); erro(new Error('script não carregou: ' + src)); }; document.head.appendChild(s); }); }
+let _localOk = true;   // GE-17: vira false se a cópia local falhar (não tenta de novo a cada foto)
+async function criarLeitor(){
+  // fora do site (arquivo aberto no computador ou na pré-visualização) não há a pasta do site → usa a internet
+  let base = null;
+  try{ if(/^https?:$/.test(location.protocol)) base = new URL('tesseract/', location.href).href; }catch(e){ base = null; }
+  if(!base) _localOk = false;
+  if(typeof Tesseract === 'undefined'){
+    let achou = false;
+    if(_localOk){ try{ await carregarScript(base + 'tesseract.min.js'); achou = true; }catch(e){ _localOk = false; console.warn('leitor da pasta tesseract/ indisponível, usando a internet.', e); } }
+    if(!achou){
+      try{ await carregarScript('https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js'); }
+      catch(e){ throw new Error('não foi possível carregar o leitor de texto (verifique a internet)'); }
+    }
+  }
+  if(_localOk){
+    try{ return await Tesseract.createWorker('por', 1, {workerPath: base + 'worker.min.js', corePath: base + 'core', langPath: base + 'lang', gzip: true}); }
+    catch(e){ _localOk = false; console.warn('GE-17: não consegui iniciar o leitor da cópia local, usando a internet.', e); }
+  }
+  return await Tesseract.createWorker('por');
+}
+async function motorOCR(){
+  if(_ocr) return _ocr;
+  _ocr = await criarLeitor();
+  return _ocr;
+}
+async function textoDaFoto(blob){
+  const bmp = await abrirImagem(blob);
+  const W = bmp.width, H = bmp.height, k = Math.min(1, 1800 / Math.max(W, H));
+  const pedacos = [[0, .55, 1, .45], [0, 0, 1, .34]];  // faixa de baixo primeiro (onde fica o endereço), depois a de cima
+  const w = await motorOCR();
+  try{ await w.setParameters({tessedit_pageseg_mode: '6', preserve_interword_spaces: '1'}); }catch(e){}
+  const ler = async (modo) => {
+    let txt = '';
+    for(const [x, y, ww, hh] of pedacos){
+      const c = document.createElement('canvas'); c.width = Math.round(W * ww * k); c.height = Math.round(H * hh * k);
+      const g = c.getContext('2d', {willReadFrequently: true});
+      if(modo === 'claro') g.filter = 'grayscale(1)'; else g.filter = 'grayscale(1) contrast(1.4)';
+      g.drawImage(bmp, W * x, H * y, W * ww, H * hh, 0, 0, c.width, c.height);
+      let alvo = c;
+      if(modo === 'claro'){   // tarja de texto branco: deixa só os pixels claros (preto sobre branco) e amplia 2x
+        const d = g.getImageData(0, 0, c.width, c.height), p = d.data;
+        for(let i = 0; i < p.length; i += 4){ const v = p[i] > 215 ? 0 : 255; p[i] = p[i + 1] = p[i + 2] = v; p[i + 3] = 255; }
+        g.putImageData(d, 0, 0);
+        alvo = document.createElement('canvas'); alvo.width = c.width * 2; alvo.height = c.height * 2;
+        const g2 = alvo.getContext('2d'); g2.fillStyle = '#fff'; g2.fillRect(0, 0, alvo.width, alvo.height); g2.drawImage(c, 0, 0, alvo.width, alvo.height);
+      }
+      const r = await w.recognize(alvo); txt += '\n' + (r && r.data ? r.data.text : '');
+    }
+    return txt;
+  };
+  let txt = await ler('claro');
+  if(!lerCoordenadas(txt) && !lerEnderecoTarja(txt)) txt += '\n' + await ler('normal');
+  if(bmp.close) bmp.close();
+  return txt;
+}
+function dist(a, b, c, d){ const R = 6371000, r = Math.PI / 180; const x = (d - b) * r * Math.cos((a + c) / 2 * r), y = (c - a) * r; return Math.sqrt(x * x + y * y) * R; }
+progresso = function(){};   // sem barra de progresso do outro programa
+/* --- GE-01/GE-03: leitura da tarja (cantos, faixas, votação) --- */
+(function(){
+  const num = s => parseFloat(String(s).replace(',', '.'));
+  const dms = (g, m, s) => num(g) + num(m) / 60 + num(s) / 3600;
+
+  /* ---------- 1. coordenada do carimbo das câmeras com GPS ---------- */
+  function coordsLetra(txt){
+    const t = String(txt || '').replace(/[“”″]/g, '"').replace(/[’′‘`]/g, "'").replace(/º/g, '°');
+    // S 22° 28' 39.307" W 41° 54' 40.747"  (letra antes do número)
+    const m = t.match(/([SN])\s*(\d{1,2})\s*°\s*(\d{1,2})\s*'\s*(\d{1,2}(?:[.,]\d+)?)\s*"?[\s,;]*([WOEL])\s*(\d{1,3})\s*°\s*(\d{1,2})\s*'\s*(\d{1,2}(?:[.,]\d+)?)/);
+    if(m){ let la = dms(m[2], m[3], m[4]), lo = dms(m[6], m[7], m[8]); if(m[1] === 'S') la = -la; if(/[WO]/.test(m[5])) lo = -lo; return valida(la, lo); }
+    return null;
+  }
+  /* GE-07: graus, minutos e segundos separados por espaço, letra depois (nome de arquivo “22 30 45.8S 41 55 01.6W”) */
+  function coordsEspaco(txt){
+    const m = String(txt || '').match(/(\d{1,2})[\s°]+(\d{1,2})[\s']+(\d{1,2}(?:[.,]\d+)?)\s*"?\s*([NS])[\s,;]+(\d{1,3})[\s°]+(\d{1,2})[\s']+(\d{1,2}(?:[.,]\d+)?)\s*"?\s*([EWOL])(?![A-Za-z])/i);
+    if(!m || +m[2] >= 60 || +m[6] >= 60 || num(m[3]) >= 60 || num(m[7]) >= 60) return null;
+    let la = dms(m[1], m[2], m[3]), lo = dms(m[5], m[6], m[7]); if(/s/i.test(m[4])) la = -la; if(/[wo]/i.test(m[8])) lo = -lo;
+    return valida(la, lo);
+  }
+  window.__geCoordsEspaco = coordsEspaco;
+  function coordsCarimbo(txt){
+    const t = String(txt || '').replace(/[“”″]/g, '"').replace(/[’′‘`]/g, "'").replace(/º/g, '°');
+    // S 22° 28' 39.307" W 41° 54' 40.747"  (letra antes do número)
+    let m = t.match(/([SN])\s*(\d{1,2})\s*°\s*(\d{2})\s*'\s*(\d{2}(?:[.,]\d+)?)\s*"?[\s,;]*([WOEL])\s*(\d{1,3})\s*°\s*(\d{2})\s*'\s*(\d{2}(?:[.,]\d+)?)/);
+    if(m && +m[3] < 60 && +m[7] < 60 && num(m[4]) < 60 && num(m[8]) < 60){ let la = dms(m[2], m[3], m[4]), lo = dms(m[6], m[7], m[8]); if(m[1] === 'S') la = -la; if(/[WO]/.test(m[5])) lo = -lo; const v = valida(la, lo); if(v) return v; }
+    // leitura por OCR com símbolos trocados ou perdidos (S lido como 8, ° como ! ou ', segundos grudados: “22 2839115"”):
+    // linha por linha, graus com 2 dígitos, faixas do Brasil (sul/oeste); nunca junta números de linhas diferentes
+    const ok = (a, b, c, d, e, f) => { const la = dms(a, b, c), lo = dms(d, e, f);
+      if(+b >= 60 || +e >= 60 || num(c) >= 60 || num(f) >= 60 || +a < 1 || +a > 34 || +d < 34 || +d > 74) return null; return valida(-la, -lo); };
+    for(const lin of t.split(/\n/)){
+      let q = lin.match(/(?:^|\D)(\d{2})\D{1,3}(\d{2})\D{1,3}(\d{2}(?:[.,]\d{1,4})?)\D{1,6}(\d{2})\D{1,3}(\d{2})\D{1,3}(\d{2}(?:[.,]\d{1,4})?)(?!\d)/);
+      if(q){ const v = ok(q[1], q[2], q[3], q[4], q[5], q[6]); if(v) return v; }
+      // segundos com o ponto perdido: “22/28 39115"” = 22° 28' 39,115"
+      q = lin.match(/(?:^|\D)(\d{2})\D{1,3}(\d{2})\D{1,3}(\d{2})(\d{3})(?!\d)\D{1,6}(\d{2})\D{1,3}(\d{2})\D{1,3}(\d{2}(?:[.,]\d{1,4})?)(?!\d)/);
+      if(q){ const v = ok(q[1], q[2], q[3] + '.' + q[4], q[5], q[6], q[7]); if(v) return v; }
+      // S lido como 8/5/$ e tudo grudado: “8222839115"” ou “822º 2839115"” = S 22° 28' 39,115"
+      q = lin.match(/(?:^|[^\d])[8S5$]\D{0,2}(\d{2})\D{0,2}(\d{2})\D{0,2}(\d{2})[.,]?(\d{3})(?!\d)\D{1,6}(\d{2})\D{1,3}(\d{2})\D{1,3}(\d{2}(?:[.,]\d{1,4})?)(?!\d)/);
+      if(q){ const v = ok(q[1], q[2], q[3] + '.' + q[4], q[5], q[6], q[7]); if(v) return v; }
+      // minutos e segundos grudados: “22 2839115"” = 22° 28' 39,115"
+      q = lin.match(/(?:^|\D)(\d{2})\D{1,3}(\d{2})(\d{2})[.,]?(\d{1,4})\D{1,6}(\d{2})\D{1,3}(\d{2})\D{1,3}(\d{2}(?:[.,]\d{1,4})?)(?!\d)/);
+      if(q){ const v = ok(q[1], q[2], q[3] + '.' + q[4], q[5], q[6], q[7]); if(v) return v; }
+    }
+    return null;
+  }
+  const lerCoordOrig = lerCoordenadas;
+  /* texto lido da tarja → coordenada já conferida por textoDaFoto (2 leituras iguais); null = não confiável.
+     Assim a regra antiga e frouxa (minuto de 1 dígito: “41° 5' 42"” → ponto no mar) não age no texto do OCR. */
+  const COORD_TXT = new Map();
+  lerCoordenadas = function(t){ if(COORD_TXT.has(t)) return COORD_TXT.get(t); return lerCoordOrig(t) || coordsCarimbo(t); };
+  /* todas as coordenadas COMPLETAS de um texto do OCR (graus, minutos e segundos com 2 dígitos), linha por linha */
+  function candidatos(txt){
+    const out = [], t = String(txt || '').replace(/[“”″]/g, '"').replace(/[’′‘`]/g, "'").replace(/º/g, '°');
+    const L = t.split(/\n/);
+    for(const lin of L){
+      const c = coordsCarimbo(lin.replace(/([SN])\s*(\d)\s*°/g, '$1 0$2°')) || coordsDecimal(lin);
+      if(c && Math.abs(c.lat) >= 1){ out.push({lat: c.lat, lon: c.lon, lin: lin.trim()}); }
+    }
+    // GE-06: “Latitude -22.477570” numa linha e “Longitude -41.911250” na seguinte
+    if(!out.length) for(let i = 0; i + 1 < L.length; i++){
+      const c = coordsDecimal(L[i] + ' ' + L[i + 1]);
+      if(c){ out.push({lat: c.lat, lon: c.lon, lin: (L[i] + ' ' + L[i + 1]).trim()}); break; }
+    }
+    return out;
+  }
+  /* GE-06 (24/11/2026): coordenada em graus DECIMAIS no carimbo (GPS Map Camera, Timestamp Camera etc.):
+     “Lat -22.477570° Long -41.911250°”, “-22,47757, -41,91125”, “22.4775 S 41.9112 W”.
+     Só faixa do Brasil sul/oeste (lat 1–34, lon 34–74), 4+ casas decimais; sinal sempre S/W (o OCR perde o “-”). */
+  function coordsDecimal(txt){
+    const t = String(txt || '').replace(/[~—–]/g, '-');
+    const m = t.match(/(?:^|[^\d.,])-?\s?(\d{1,2})[.,](\d{4,8})(?!\d)[^\d]{1,24}?-?\s?(\d{2})[.,](\d{4,8})(?!\d)/);
+    if(!m) return null;
+    const la = +(m[1] + '.' + m[2]), lo = +(m[3] + '.' + m[4]);
+    if(la < 1 || la > 34 || lo < 34 || lo > 74) return null;
+    return valida(-la, -lo);
+  }
+  window.__ge03 = {candidatos, COORD_TXT};
+
+  /* endereço do carimbo (SP-13): reserva quando a leitura deste programa não acha a rua */
+  const LIXO = /^(rio das ostras|rio de janeiro|rj|brasil|brazil)$/i;
+  function endereco1(t){
+    const L = String(t || '').split(/\n/).map(x => x.replace(/[|“”"]/g, ' ').replace(/\s+/g, ' ').trim()).filter(Boolean);
+    for(let i = 0; i < L.length; i++){
+      const m = L[i].match(/(?:^|[^A-Za-zÀ-ÿ])(R\.|Rua|Av\.|Avenida|Rod\.|Rodovia|Estr\.|Estrada|Alameda|Al\.|Travessa|Tv\.|Praça|Pça\.)\s*[A-Za-zÀ-ÿ0-9].*/i); if(!m) continue;
+      let s = m[0].replace(/^[^A-Za-zÀ-ÿ]+/, '').split(/[;|]/)[0], bairro = '';
+      const mb = s.match(/\s[-–]\s*([^,\-–]+?)\s*,\s*Rio(\s+das)?\b/i) || s.match(/,\s*([A-Za-zÀ-ÿ][^,\d]{2,}?)\s*,\s*Rio(\s+das)?\b/i); if(mb) bairro = mb[1].trim();
+      s = s.replace(/\s[-–]\s.*$/, '').replace(/,\s*Rio(\s+das)?\b.*$/i, '').replace(bairro ? new RegExp(',\\s*' + bairro.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '.*$') : /$^/, '').replace(/,\s*\d{5}-?\d{3}.*$/, '').trim();
+      if(!bairro && L[i + 1] && !LIXO.test(L[i + 1]) && !/\d{5}-?\d{3}|altitude|velocidade|índice|indice/i.test(L[i + 1])) bairro = L[i + 1].replace(/,.*$/, '').replace(/^[^A-Za-zÀ-ÿ]+/, '').trim();
+      s = s.replace(/[^A-Za-zÀ-ÿ0-9]+$/, '').trim();
+      if(s.split(' ').length > 8) continue; if(bairro.split(' ').length > 5) bairro = '';
+      if(s.length >= 5){ const mn = s.match(/,\s*(\d{1,5})$/); const rua = mn ? s.slice(0, mn.index).trim() : s; const nume = mn ? mn[1] : '';
+        bairro = bairro.length >= 3 ? bairro : '';
+        return {rua, num: nume, bairro, cep: (String(t).match(/\b(\d{5})-?(\d{3})\b/) || [])[0] || '', texto: [rua + (nume ? ', ' + nume : ''), bairro].filter(Boolean).join(' - ')}; }
+    }
+    return null;
+  }
+  /* data da tarja com os erros comuns do OCR: “10.de nov.”, “now”/“n0v”, “2O26” */
+  const lerDataOrig = lerDataTarja;
+  // só aceita data possível: dia escrito ≤ 31 (o OCR lê “190 de nov.”) e não no futuro
+  const dataBoa = (iso, lin) => { if(!iso) return false; const d = new Date(iso); if(isNaN(d) || d > new Date(Date.now() + 864e5) || d.getFullYear() < 2000) return false;
+    const m = String(lin).match(/(\d+)\s*(?:de\s*)?(?:jan|fev|mar|abr|mai|jun|jul|ago|set|out|nov|dez)/i); return !m || +m[1] <= 31; };
+  lerDataTarja = function(t){
+    const lin = String(t || '').split(/\n/);
+    for(const l of lin){ const d = lerDataOrig(l); if(dataBoa(d, l)) return d; }
+    for(const l of lin){
+      const u = l.replace(/(\d)\s*[.,;:]\s*(?=de\b)/gi, '$1 ').replace(/\bn[o0][wvyu]\b\.?/gi, 'nov').replace(/\b(\d)O(\d{2})\b/g, '$10$2').replace(/\b2O(\d{2})\b/g, '20$1');
+      if(u !== l){ const d = lerDataOrig(u); if(dataBoa(d, u)) return d; }
+    }
+    const d = lerDataOrig(t); return dataBoa(d, t) ? d : '';
+  };
+  const lerEndOrig = lerEnderecoTarja;
+  lerEnderecoTarja = function(t){
+    const e = lerEndOrig(t) || endereco1(t); if(!e) return e;
+    // bairro lido pelo OCR com restos no começo (“o Tt EBedomino Praia Ancora” → “Praia Ancora”)
+    if(e.bairro){ const w = e.bairro.split(' '); while(w.length > 1 && (w[0].length <= 2 || /^[A-Z]{2,}[a-z]/.test(w[0]) || !/^[A-Za-zÀ-ÿ]/.test(w[0]))) w.shift(); e.bairro = w.join(' ');
+      e.texto = [e.rua + (e.num ? ', ' + e.num : ''), e.bairro].filter(Boolean).join(' - '); }
+    return e;
+  };
+
+  /* ---------- 2. leitura da tarja ----------
+     Carimbo das câmeras com GPS = texto BRANCO com contorno escuro, num canto (alto ou baixo, à direita).
+     Sobre céu claro/nublado o limiar antigo (>215) pegava o céu junto e o texto saía embaralhado
+     (foto do dono, 23/11/2026: “Rua das Camélias” lido como “Pya das EECA”). Agora: recorte do canto,
+     ampliado, só pixels quase brancos e sem cor (ou amarelos), em limiares 245 → 238 → 250 → 228,
+     primeiro no alto à direita, depois embaixo à direita, depois faixas inteiras; para quando acha
+     coordenada e endereço. Se nada servir, a leitura do SP-13 e a antiga continuam como reserva. */
+  /* modo 'lim': pixel quase branco (ou amarelo) sem cor.
+     modo 'cont': pixel claro COM contorno escuro por perto — o carimbo tem sombra preta em volta das letras;
+     o céu branco não tem, então o texto sai limpo mesmo quando o fundo tem a mesma cor do texto. */
+  function recorteBranco(bmp, [y0, y1, x0, x1], t, k, modo){
+    const W = bmp.width, H = bmp.height;
+    return binariza(bmp, W * x0, H * y0, W * (x1 - x0), H * (y1 - y0), Math.min(k, 2400 / (W * (x1 - x0))), modo, t);
+  }
+  function binariza(bmp, sx, sy, sw, sh, k, modo, t){
+    const c = document.createElement('canvas'); c.width = Math.round(sw * k); c.height = Math.round(sh * k);
+    const g = c.getContext('2d', {willReadFrequently: true}); g.imageSmoothingQuality = 'high'; g.drawImage(bmp, sx, sy, sw, sh, 0, 0, c.width, c.height);
+    const w = c.width, h = c.height, d = g.getImageData(0, 0, w, h), p = d.data, n = w * h;
+    const L = new Uint8ClampedArray(n); for(let i = 0; i < n; i++) L[i] = (p[4 * i] + p[4 * i + 1] + p[4 * i + 2]) / 3;
+    let M = null;
+    if(modo === 'cont'){   // mínimo da vizinhança (janela quadrada, separável)
+      const r = Math.max(2, Math.round(1.6 * k)), tmp = new Uint8ClampedArray(n); M = new Uint8ClampedArray(n);
+      for(let y = 0; y < h; y++) for(let x = 0; x < w; x++){ let m = 255; for(let q = Math.max(0, x - r); q <= Math.min(w - 1, x + r); q++){ const v = L[y * w + q]; if(v < m) m = v; } tmp[y * w + x] = m; }
+      for(let x = 0; x < w; x++) for(let y = 0; y < h; y++){ let m = 255; for(let q = Math.max(0, y - r); q <= Math.min(h - 1, y + r); q++){ const v = tmp[q * w + x]; if(v < m) m = v; } M[y * w + x] = m; }
+    }
+    let cl = 0;
+    for(let i = 0; i < n; i++){
+      const r = p[4 * i], gg = p[4 * i + 1], b = p[4 * i + 2], mx = Math.max(r, gg, b), mn = Math.min(r, gg, b);
+      const tx = modo === 'cont' ? (L[i] > t && mx - mn < 45 && M[i] < L[i] - 70)
+                                 : ((L[i] > t && mx - mn < 40) || (r > 200 && gg > 165 && b < 140 && r - b > 90));
+      if(tx) cl++; const v = tx ? 0 : 255; p[4 * i] = p[4 * i + 1] = p[4 * i + 2] = v; p[4 * i + 3] = 255;
+    }
+    g.putImageData(d, 0, 0);
+    return {c, claro: cl / n, k, sx, sy};
+  }
+  /* linha da coordenada no resultado do OCR (tem W/°/' e 8+ dígitos, sem “:” de hora nem ano) */
+  function linhaCoord(linhas){
+    return (linhas || []).find(l => { const t = l.text || '', dg = (t.match(/\d/g) || []).length;
+      return dg >= 8 && ((!/:|20\d\d|BRT|nov|de\s/i.test(t) && /[WwV°º'"]/.test(t)) || !!coordsDecimal(t)); });   // GE-06: decimal também
+  }
+  // [limiar, modo do OCR, altura da linha em px, só números?]. O modo “contorno” lia 41→49 e 54→24 nesta linha: fica de fora.
+  const VAR_LINHA = [[245, '7', 40, 0], [245, '6', 40, 1], [245, '6', 60, 0], [238, '7', 40, 0], [250, '6', 60, 1], [232, '7', 60, 0], [245, '7', 60, 1]];
+  const SO_COORD = '0123456789SWNO°\'".,- ';
+  /* relê só a linha da coordenada, ampliada, com o OCR restrito a números e símbolos; devolve as leituras */
+  async function lerLinha(w, bmp, rec, bb, fora){
+    fora = fora || [];
+    const out = [], hL = (bb.y1 - bb.y0) / rec.k, pad = hL * .45;
+    const sx = rec.sx + Math.max(0, bb.x0 / rec.k - hL), sy = Math.max(0, rec.sy + bb.y0 / rec.k - pad);
+    const sw = Math.min(bmp.width - sx, (bb.x1 - bb.x0) / rec.k + 2 * hL), sh = Math.min(bmp.height - sy, hL + 2 * pad);
+    try{
+      for(const [t, pm, alvo, so] of VAR_LINHA){
+        const k = Math.min(alvo / hL, 3000 / sw);
+        try{ await w.setParameters({tessedit_pageseg_mode: pm, tessedit_char_whitelist: so ? SO_COORD : ''}); }catch(e){}
+        const {c, claro} = binariza(bmp, sx, sy, sw, sh, k, 'lim', t); if(claro < .005 || claro > .6) continue;
+        const r = await w.recognize(c), tx = (r && r.data ? r.data.text : '');
+        if(window.__ge03log) window.__ge03log.push('linha ' + t + '/' + pm + '/' + alvo + (so ? 'n' : '') + ': ' + tx.trim().replace(/\n/g, ' | '));
+        const cf = r && r.data ? r.data.confidence : 0;
+        candidatos(tx).slice(0, 1).forEach(x => { x.linha = true; x.conf = cf; out.push(x); });
+        if(window.__ge20Ativo && window.__ge16Frouxa && !candidatos(tx).length){ const c2 = window.__ge16Frouxa(tx); if(c2) out.push({lat: c2.lat, lon: c2.lon, lin: tx.trim().replace(/\n/g, ' '), linha: true, conf: cf * .6, frouxa: true}); }   // GE-20: só no resgate
+        if(!window.__ge03semParar && vencedora(votar(fora.concat(out)))) break;
+      }
+    }finally{ try{ await w.setParameters({tessedit_pageseg_mode: '6', tessedit_char_whitelist: ''}); }catch(e){} }
+    return out;
+  }
+  const CANTOS = [[0, .34, .2, 1], [.66, 1, .2, 1]], FAIXAS = [[0, .34, 0, 1], [.66, 1, 0, 1]];
+  const VARIANTES = [['lim', 245, 2], ['lim', 238, 3], ['lim', 250, 2], ['cont', 200, 2], ['lim', 228, 2], ['cont', 180, 3]];
+  const INFO = new WeakMap();   // blob → {votos, unico, recusada, cands}
+  /* agrupa as leituras: iguais até ~30 m contam como a mesma coordenada */
+  function votar(cands){
+    const grupos = [];
+    cands.forEach(c => { const g = grupos.find(g => Math.abs(g.lat - c.lat) < 3e-4 && Math.abs(g.lon - c.lon) < 3e-4); if(g) g.lista.push(c); else grupos.push({lat: c.lat, lon: c.lon, lista: [c]}); });
+    grupos.forEach(g => { g.pontos = g.lista.reduce((s, c) => s + Math.max(10, c.conf || 0), 0); });
+    grupos.sort((a, b) => b.pontos - a.pontos || b.lista.length - a.lista.length);
+    return grupos;
+  }
+  /* vencedora clara: 3+ leituras e o dobro da confiança somada da 2ª (para de ler) */
+  function vencedora(g){ return g.length && g[0].lista.length >= 3 && (g.length === 1 || g[0].pontos >= 2 * g[1].pontos); }
+  const textoOrig = textoDaFoto;
+  textoDaFoto = async function(blob){
+    let txt = ''; const cands = [];
+    const confirmada = () => { if(window.__ge03semParar) return false; return vencedora(votar(cands)); };
+    const pronto = () => confirmada() && lerEnderecoTarja(txt);
+    try{
+      const w = await motorOCR();
+      try{ await w.setParameters({tessedit_pageseg_mode: '6', preserve_interword_spaces: '1'}); }catch(e){}
+      const bmp = await abrirImagem(blob), t0 = Date.now();
+      const feitas = new Set();
+      const ler = async (cr, [modo, lim, k]) => {
+        const rec = recorteBranco(bmp, cr, lim, k, modo);
+        if(rec.claro < .003 || rec.claro > .5) return;   // sem texto branco, ou quase tudo branco
+        const r = await w.recognize(rec.c), tx = (r && r.data ? r.data.text : '');
+        txt += '\n' + tx;
+        const lc = linhaCoord(r && r.data && r.data.lines);
+        candidatos(tx).slice(0, 1).forEach(x => { x.conf = lc ? lc.confidence : (r.data.confidence || 0); cands.push(x); });
+        if(window.__ge03log) window.__ge03log.push('[' + modo + lim + '] linhas: ' + (r.data.lines || []).map(l => l.text.trim()).join(' / ') + (lc ? '  => LINHA: ' + lc.text.trim() : ''));
+        if(lc && !feitas.has(cr) && !confirmada()){ feitas.add(cr); (await lerLinha(w, bmp, rec, lc.bbox, cands)).forEach(x => cands.push(x)); }
+      };
+      try{
+        for(const v of VARIANTES){ for(const cr of CANTOS){ if(pronto() || Date.now() - t0 > 30000) break; await ler(cr, v); } if(pronto()) break; }
+        if(!cands.length && !lerEnderecoTarja(txt)) for(const v of VARIANTES.slice(0, 2)) for(const cr of FAIXAS){ if(pronto() || Date.now() - t0 > 40000) break; await ler(cr, v); }
+      }finally{ if(bmp.close) bmp.close(); }
+    }catch(e){ if(/leitor de texto/.test(e.message || '')) throw e; console.warn('GE-03 tarja:', e); }
+    if(!cands.length && !lerEnderecoTarja(txt)){ try{ txt += '\n' + await textoOrig(blob); candidatos(txt).forEach(x => cands.push(x)); }catch(e){ if(!txt.trim()) throw e; } }
+    // decisão: 2 leituras iguais = confirmada; 1 leitura só sem endereço = usa e pede conferência;
+    // leituras diferentes, ou 1 só com endereço legível = recusa a coordenada (vai pelo endereço)
+    const g = votar(cands), end = lerEnderecoTarja(txt);
+    let coord = null, info = {votos: g.length ? g[0].lista.length : 0, cands: cands.map(c => c.lin), confs: cands.map(c => Math.round(c.conf || 0)), coords: cands.map(c => c.lat.toFixed(5) + ',' + c.lon.toFixed(5)), unico: false, recusada: false};
+    if(g.length && g[0].lista.length >= 2 && (g.length === 1 || g[0].pontos >= 1.5 * g[1].pontos)){
+      const dig = c => (c.lin.match(/\d{2}[.,]\d{2,}/g) || []).length * 100 + (c.lin.match(/\d/g) || []).length;
+      const best = g[0].lista.slice().sort((x, y) => dig(y) - dig(x))[0];
+      coord = {lat: best.lat, lon: best.lon};
+    }else if(g.length === 1 && !end){ coord = {lat: g[0].lat, lon: g[0].lon}; info.unico = true; }
+    else if(g.length){ info.recusada = true; }
+    txt = txt.trim();
+    COORD_TXT.set(txt, coord); INFO.set(blob, info);
+    return txt;
+  };
+  /* depois de ler a tarja: avisos de conferência e trava de região */
+  const ocrOrig = ocrFotos;
+  ocrFotos = async function(lista, umaSo){
+    const r = await ocrOrig.apply(this, arguments);
+    (lista || []).forEach(f => {
+      const info = INFO.get(BLOBS.get(f.id)); if(!info) return;
+      if(info.unico && f.orig === 'tarja') f.conferencia = 'Coordenada da tarja lida uma vez só (não confirmada por outra leitura): confira no mapa.';
+      if(info.recusada && !temLocal(f)) f.conferencia = 'As leituras da coordenada na tarja não bateram (' + info.cands.slice(0, 3).join(' | ') + '): usado o endereço da tarja.';
+    });
+    const recusadas = regiao(lista); salvar(); renderFotos();
+    const comEnd = recusadas.filter(f => !temLocal(f) && f.end);
+    if(comEnd.length){ try{ await geocodificar(comEnd); }catch(e){ console.warn(e); } }
+    return r;
+  };
+  /* coordenada da tarja muito longe das outras fotos do trabalho (OCR perdeu um número) → recusada */
+  function regiao(lista){
+    const base = S.fotos.filter(f => temLocal(f) && /^(gps|prop|tarja|nome|manual)$/.test(f.orig || ''));
+    const fora = [];
+    if(base.length < 3) return fora;
+    const med = a => a.slice().sort((x, y) => x - y)[Math.floor(a.length / 2)];
+    const cLat = med(base.map(f => f.lat)), cLon = med(base.map(f => f.lon));
+    (lista || S.fotos).forEach(f => {
+      if(!temLocal(f) || f.orig !== 'tarja') return;
+      const km = dist(cLat, cLon, f.lat, f.lon) / 1000;
+      if(km > 15){
+        f.conferencia = 'A coordenada lida na tarja (' + f.lat.toFixed(6) + ', ' + f.lon.toFixed(6) + ') fica a ' + Math.round(km) + ' km das outras fotos: o leitor deve ter perdido um número. Foi descartada' + (f.end ? ' e o local vem do endereço da tarja.' : '; marque no mapa.');
+        delete f.lat; delete f.lon; f.orig = null; fora.push(f);
+      }
+    });
+    return fora;
+  }
+  window.__ge03.regiao = regiao; window.__ge03.INFO = INFO; window.__ge03.binariza = binariza; window.__ge03.recorteBranco = recorteBranco; window.__ge03.linhaCoord = linhaCoord;
+  window.__ge03.lerLinha = lerLinha; window.__ge03.votar = votar; window.__ge03.vencedora = vencedora;   // GE-20: usados só no resgate
+
+})();
+/* --- GE-16/GE-20: leitor de endereço por votação --- */
+(function(root){
+  const TIPOS = 'Rua|R\\.|Avenida|Av\\.?|Alameda|Al\\.|Travessa|Tv\\.|Estrada|Estr\\.|Rodovia|Rod\\.|Pra[çc]a|Largo|Servid[aã]o|Beco|Via|Viela|Ladeira|Caminho';
+  const SEM = s => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '');
+  const EXPANDE = [[/^r\.?$/i, 'Rua'], [/^av\.?$/i, 'Avenida'], [/^tv\.?$/i, 'Travessa'], [/^estr\.?$/i, 'Estrada'], [/^rod\.?$/i, 'Rodovia'], [/^al\.?$/i, 'Alameda']];
+  const CIDADE = /\b(rio\s+das\s+ostras|rio\s+de\s+janeiro|rj|brasil|brazil)\b/i;
+  const NAO_BAIRRO = /^\d|\d{3}|^(lt|qd|lote|quadra|casa|apto?|bloco)\b|\b(rio\s+das\s+ostras|rio\s+de\s+janeiro|rj|brasil|brazil|altitude|velocidade|n[uú]mero|[ií]ndice|timemark|foto|verified|subsecret|c[oó]digo)\b/i;
+
+  function normaliza(l){
+    return String(l || '').replace(/[|“”"‘’`´]/g, ' ')
+      .replace(/([A-Za-zÀ-ÿ])[.;:]\s+(\d{1,5})(?=\s|$)/g, '$1, $2')     // “Cunha. 1324” → “Cunha, 1324”
+      .replace(/(?<=[A-Za-zÀ-ÿ])'(?=[A-Za-zÀ-ÿ])/g, ' ')                  // “Das'Ostras” → “Das Ostras”
+      .replace(/,(?=[a-zà-ÿ])/g, ' ')                                     // “Aristoteles,da” → “Aristoteles da”
+      .replace(/\s+/g, ' ').trim();
+  }
+  const chave = r => SEM(r).toLowerCase().replace(/^(rua|r|avenida|av|alameda|al|travessa|tv|estrada|estr|rodovia|rod|praca|largo|servidao|beco|via|viela|ladeira|caminho)\b\.?\s*/, '').replace(/[^a-z0-9]/g, '');
+  function dice(a, b){
+    if(!a || !b) return 0; if(a === b) return 1; if(a.length < 3 || b.length < 3) return 0;
+    const g = s => { const m = new Map(); for(let i = 0; i < s.length - 1; i++){ const k = s.slice(i, i + 2); m.set(k, (m.get(k) || 0) + 1); } return m; };
+    const A = g(a), B = g(b); let n = 0; A.forEach((v, k) => { if(B.has(k)) n += Math.min(v, B.get(k)); });
+    return 2 * n / (a.length - 1 + b.length - 1);
+  }
+  const CONECT = /^(de|da|do|dos|das|e)$/i;
+  function limpaBairro(fr){
+    const w = String(fr).split(/\s+/).filter(Boolean);
+    while(w.length && (w[0].replace(/[^A-Za-zÀ-ÿ]/g, '').length < 3 || !/^[A-Za-zÀ-ÿ]/.test(w[0]))) w.shift();   // restos do OCR no começo
+    { const k = w.findIndex(x => !CONECT.test(x) && /^[a-zà-ÿ]/.test(x)); if(k > 0) w.splice(k); }   // GE-17: “Extensão. cases” → “Extensão” (palavra minúscula solta é resto do OCR)
+    const b = w.join(' ').replace(/[.:;,\s]+$/, '');
+    if(b.length < 3 || b.length > 38 || NAO_BAIRRO.test(b) || /[^A-Za-zÀ-ÿ '.\-]/.test(b)) return '';
+    if(w.some(x => x.length <= 2 && !CONECT.test(x))) return '';
+    return b;
+  }
+  function tipoCompleto(t){ for(const [re, c] of EXPANDE) if(re.test(t)) return c; return t.charAt(0).toUpperCase() + t.slice(1).toLowerCase(); }
+
+  /* acha o endereço escrito numa linha; devolve null se a linha não parece endereço */
+  function daLinha(l, prox){
+    const re = new RegExp('(?:^|[^A-Za-zÀ-ÿ0-9])(?:(\\d{1,5})\\s+)?(' + TIPOS + ')(?=\\s)\\s+(.+)$', 'i');
+    const m = l.match(re); if(!m) return null;
+    let numAntes = m[1] || '', tipo = m[2], resto = m[3];
+    // até a primeira vírgula ou “ - ”
+    let corte = resto.search(/,|\s[-–]\s/), nome = corte >= 0 ? resto.slice(0, corte) : resto, cauda = corte >= 0 ? resto.slice(corte) : '';
+    // cidade/UF/CEP grudados no nome (mas “Avenida Novo Rio das Ostras” é nome de rua)
+    const rx = new RegExp(CIDADE.source, 'ig'); let mc;
+    while((mc = rx.exec(nome))){ if(/\bnovo\s*$/i.test(nome.slice(0, mc.index))) continue; cauda = nome.slice(mc.index) + ' ' + cauda; nome = nome.slice(0, mc.index); break; }
+    nome = nome.replace(/\d{5}-?\d{3}.*$/, '').replace(/[.:;]+$/, '').trim();
+    if(/[^A-Za-zÀ-ÿ0-9 .'\-]/.test(nome)) return null;
+    let num = numAntes;
+    const tn = nome.match(/\s+(\d{1,5})$/);
+    if(tn && /[A-Za-zÀ-ÿ]{3,}/.test(nome.slice(0, tn.index))){ if(!num) num = tn[1]; nome = nome.slice(0, tn.index).trim(); }
+    const cn = cauda.match(/^\s*,\s*(\d{1,5})\b/); if(cn && !num) num = cn[1];
+    // plausibilidade: o OCR embaralhado dá “r. e GR a qa”
+    const palavras = nome.split(/\s+/).filter(Boolean);
+    const letras = (nome.match(/[A-Za-zÀ-ÿ]/g) || []).length, total = nome.replace(/\s/g, '').length || 1;
+    if(!palavras.length || !palavras.some(p => (p.match(/[A-Za-zÀ-ÿ]/g) || []).length >= 4)) return null;
+    if(letras < 5 || letras / total < .85 || nome.length > 55) return null;
+    if(palavras.filter(p => p.length <= 2 && !/^(de|da|do|e|a|o|dos|das)$/i.test(p)).length > palavras.length / 2) return null;
+    // bairro: depois da vírgula / traço, ou na linha seguinte
+    let bairro = '';
+    for(const fr of cauda.split(/,|\s[-–]\s/).map(x => x.replace(/^[\s.:;-]+|[\s.:;-]+$/g, '')).filter(Boolean)){
+      const b = limpaBairro(fr); if(b){ bairro = b; break; }
+    }
+    if(!bairro && prox && !new RegExp('^(' + TIPOS + ')\\s', 'i').test(prox)) bairro = limpaBairro(prox);
+    const rua = tipoCompleto(tipo) + ' ' + nome;
+    let nota = 0;
+    if(/^(rua|avenida|alameda|travessa|estrada|rodovia|pra[çc]a|largo|servid[aã]o|beco|via|viela|ladeira|caminho)$/i.test(tipo)) nota += 2;
+    if(num) nota += 1; if(bairro) nota += 1;
+    if(CIDADE.test(l.slice(m.index + m[0].length - resto.length + (corte >= 0 ? corte : 0)) + ' ' + (prox || ''))) nota += 1;
+    if(palavras.length >= 2) nota += 1;
+    return {rua, num, bairro, nota, chave: chave(rua)};
+  }
+
+  function lerEndereco(txt){
+    const linhas = String(txt || '').split(/\n+/).map(normaliza).filter(Boolean);
+    const cands = [];
+    linhas.forEach((l, i) => { const c = daLinha(l, linhas[i + 1]); if(c) cands.push(c); });
+    if(!cands.length) return null;
+    cands.forEach(c => { c.apoio = cands.filter(d => d === c || dice(c.chave, d.chave) >= .82 || (c.chave.length >= 6 && d.chave.length >= 6 && (c.chave.startsWith(d.chave) || d.chave.startsWith(c.chave)))); });
+    cands.sort((a, b) => (b.apoio.length * 3 + b.nota) - (a.apoio.length * 3 + a.nota) || b.chave.length - a.chave.length);
+    const top = cands[0];
+    // entre as leituras do mesmo nome, vale a mais comprida (a outra pode estar cortada) e a que mais se repete
+    const mesmo = top.apoio.slice().sort((a, b) => b.chave.length - a.chave.length);
+    const longo = mesmo.find(c => c.chave.length <= top.chave.length * 1.5 + 2 && top.apoio.filter(d => d.chave.startsWith(c.chave) || c.chave.startsWith(d.chave)).length >= 2) || top;
+    const maisComum = (lista, f) => { const m = new Map(); lista.forEach(c => { const v = f(c); if(v) m.set(v, (m.get(v) || 0) + 1); }); return [...m.entries()].sort((a, b) => b[1] - a[1])[0]; };
+    const rua = (maisComum(top.apoio, c => c.rua.toLowerCase()) ? top.apoio.find(c => c.rua.toLowerCase() === maisComum(top.apoio, c2 => c2.rua.toLowerCase())[0]).rua : top.rua);
+    const num = (maisComum(top.apoio, c => c.num) || [''])[0];
+    const bairro = (maisComum(top.apoio, c => c.bairro) || [''])[0];
+    const cep = (String(txt).match(/\b(\d{5})-?(\d{3})\b/) || [])[0] || '';
+    const kr = chave(rua);
+    const final = (longo !== top && longo.chave.startsWith(kr) && longo.chave.length > kr.length && top.apoio.filter(d => d.chave === longo.chave).length >= 2) ? longo.rua : rua;
+    return {rua: final, num, bairro, cep, texto: [final + (num ? ', ' + num : ''), bairro].filter(Boolean).join(' - '), votos: top.apoio.length};
+  }
+  root.ge16 = {lerEndereco, normaliza, dice, chave, dados: {dice}};
+  })(typeof window !== 'undefined' ? window : globalThis);
+/* --- GE-20: 2ª leitura (recortes à esquerda/meio, graus com símbolos perdidos) --- */
+(function(){
+  const G3 = window.__ge03;
+  window.__ge16Frouxa = function(txt){
+    const ref = refLocal(), la = String(Math.floor(Math.abs(ref.lat))), lo0 = Math.floor(Math.abs(ref.lon));
+    for(const lin of String(txt || '').split(/\n/)){
+      if((lin.match(/\d/g) || []).length < 12) continue;
+      for(const lo of [lo0, lo0 + 1]){
+        const re = new RegExp(la + "(?:[^\\d]|8){0,3}(\\d{2})\\D{0,2}(\\d{2})[.,]?(\\d{1,2})[^\\d]{0,6}[58]?[^\\d]{0,3}" + lo + "\\D{0,3}(\\d{2})\\D{0,2}(\\d{2})[.,/]?(\\d{1,3})");
+        const m = lin.match(re); if(!m || +m[1] >= 60 || +m[2] >= 60 || +m[4] >= 60 || +m[5] >= 60) continue;
+        const v = valida(-(+la + +m[1] / 60 + (+m[2] + +('0.' + m[3])) / 3600), -(lo + +m[4] / 60 + (+m[5] + +('0.' + m[6])) / 3600));
+        if(v && noBrasil(v.lat, v.lon)) return v;
+      }
+    }
+    return null;
+  };
+
+
+  const TILES = [[.58, 1, 0, .92], [.10, .62, 0, .92], [0, .42, 0, 1], [.5, 1, 0, 1], [.55, 1, .25, 1]];   // baixo-esq., meio-esq., topo, base, baixo-dir.
+  const VARS = [['lim', 245, 2], ['lim', 238, 3], ['cont', 200, 2]];
+  const RX_COORD = /\d{1,2}\s*[°º*]\s*\d{2}|\d{2}[.,]\d{4,}/;
+  const P6 = {tessedit_pageseg_mode: '6', preserve_interword_spaces: '1', tessedit_char_whitelist: ''};
+  const mun = () => S.cfg.mun || '';
+  function centro(){   // mediana das fotos já localizadas (ou a região do trabalho)
+    const b = S.fotos.filter(f => temLocal(f));
+    if(b.length < 3) return refLocal();
+    const med = a => a.slice().sort((x, y) => x - y)[Math.floor(a.length / 2)];
+    return {lat: med(b.map(f => f.lat)), lon: med(b.map(f => f.lon))};
+  }
+  const perto = (c, km) => { const r = centro(); return dist(r.lat, r.lon, c.lat, c.lon) <= km * 1000; };
+  async function lerDeNovo(w, blob){
+    const extra = [], cands = [], feitas = new Set(), t0 = Date.now();
+    const bmp = await abrirImagem(blob);
+    try{
+      fim: for(const v of VARS){
+        for(const cr of TILES){
+          if(Date.now() - t0 > 45000) break fim;
+          const rec = G3.recorteBranco(bmp, cr, v[1], v[2], v[0]);
+          if(rec.claro < .003 || rec.claro > .5) continue;
+          await w.setParameters(P6);
+          const r = await w.recognize(rec.c), d = (r && r.data) || {}, tx = d.text || '';
+          extra.push(tx);
+          const lc = G3.linhaCoord(d.lines);
+          G3.candidatos(tx).slice(0, 1).forEach(x => { x.conf = lc ? lc.confidence : (d.confidence || 0); cands.push(x); });
+          if(!G3.candidatos(tx).length){ const c2 = window.__ge16Frouxa(tx); if(c2) cands.push({lat: c2.lat, lon: c2.lon, lin: (tx.split(/\n/).find(l => (l.match(/\d/g) || []).length >= 12) || '').trim(), conf: (lc ? lc.confidence : 40) * .6, frouxa: true}); }
+          if(lc && !feitas.has(cr.join()) && !G3.vencedora(G3.votar(cands))){
+            feitas.add(cr.join());
+            window.__ge20Ativo = true;
+            try{ (await G3.lerLinha(w, bmp, rec, lc.bbox, cands)).forEach(x => cands.push(x)); }finally{ window.__ge20Ativo = false; await w.setParameters(P6); }
+          }
+          const g = G3.votar(cands);
+          if(g.length && g[0].lista.length >= 2 && (g.length === 1 || g[0].pontos >= 2 * g[1].pontos)) break fim;   // coordenada confirmada
+        }
+        const todo = extra.join('\n'), e = window.ge16.lerEndereco(todo);
+        if(e && e.votos >= 3 && !RX_COORD.test(todo.replace(/\d{5}-?\d{3}/g, '').replace(/\d{1,2}:\d{2}(:\d{2})?/g, ''))) break;   // endereço firme e nenhum sinal de coordenada
+      }
+    }finally{ if(bmp && bmp.close) bmp.close(); }
+    return {texto: extra.join('\n'), grupos: G3.votar(cands)};
+  }
+
+  window.__ocrLerDeNovo = lerDeNovo;
+})();
+</script>
+<script>
+/* ===== LEITOR DE TEXTO (OCR) — Total Civil · versão 1 · 25/11/2026 =====
+   1) texto completo da imagem (documento: modo automático PSM 3; foto: texto espalhado PSM 11) → caixa de texto editável
+   2) opcional: as três fontes de localização (arquivo · tarja GE-03 · 2ª leitura GE-20), com as linhas da tarja consolidadas
+   3) se houver coordenada/endereço: pergunta se quer georreferenciar (Google Earth Web / KMZ com foto e texto) */
+(function(){
+  const ITENS = [];            // {id, file, url, r, texto (editado), geo (incluir no KMZ)}
+  let parar = false, rodando = false;
+  const fmt = n => (+n).toFixed(6);
+  const st = t => { $('status').textContent = t; };
+  const prog = f => { const b = $('prog'); if(f == null){ b.hidden = true; return; } b.hidden = false; b.firstElementChild.style.width = Math.round(f * 100) + '%'; };
+  const semEsp = t => String(t || '').replace(/\s/g, '').length;
+  function opcoes(){
+    const n = v => parseFloat(String(v).replace(',', '.'));
+    return {geo: $('op-geo').checked, sempre: $('op-sempre').checked, lat: n($('ref-lat').value), lon: n($('ref-lon').value)};
+  }
+  function adicionar(files){
+    [...files].filter(f => /^image\//.test(f.type) || /\.(jpe?g|png|webp|bmp|gif)$/i.test(f.name)).forEach(file => {
+      const it = {id: 'i' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), file, url: URL.createObjectURL(file), thumb: '', r: null, texto: '', geo: true};
+      ITENS.push(it);
+      miniatura(file, 480).then(m => { it.thumb = m.url; const img = document.querySelector('.res[data-id="' + it.id + '"] img'); if(img) img.src = it.thumb; }).catch(() => {});
+    });
+    desenhar(); $('bt-ler').disabled = !ITENS.length;
+    st(ITENS.length + ' imagem(ns) anexada(s). Clique em “Ler as imagens”.');
+  }
+  async function canvasDe(blob, lado){
+    const bmp = await abrirImagem(blob), M = Math.max(bmp.width, bmp.height);
+    const k = M < 1200 ? Math.min(2, 1600 / M) : Math.min(1, lado / M);   // imagem pequena: amplia (o leitor erra letra pequena)
+    const c = document.createElement('canvas'); c.width = Math.round(bmp.width * k); c.height = Math.round(bmp.height * k);
+    const g = c.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, c.width, c.height); g.drawImage(bmp, 0, 0, c.width, c.height); if(bmp.close) bmp.close();
+    return c;
+  }
+  /* linhas da tarja: o leitor lê o mesmo carimbo várias vezes (cantos, faixas, limiares); fica a versão mais repetida de cada linha */
+  function consolidar(texto){
+    const L = String(texto || '').split(/\n/).map(l => l.replace(/\s+/g, ' ').trim()).filter(l => l.length >= 4 && (l.match(/[A-Za-zÀ-ÿ0-9]/g) || []).length / l.length > .6);
+    const norm = l => semAcento(l).toLowerCase().replace(/[^a-z0-9]/g, '');
+    const grupos = [];
+    L.forEach((l, i) => { const k = norm(l); if(k.length < 4) return;
+      const g = grupos.find(x => window.ge16.dice(x.k, k) >= .8); if(g){ g.lista.push(l); } else grupos.push({k, lista: [l], i}); });
+    return grupos.filter(g => g.lista.length >= 2).sort((a, b) => a.i - b.i).map(g => {
+      const cont = new Map(); g.lista.forEach(l => cont.set(l, (cont.get(l) || 0) + 1));
+      return [...cont.entries()].sort((a, b) => b[1] - a[1] || b[0].length - a[0].length)[0][0];
+    }).join('\n');
+  }
+  async function lerImagem(file, o){
+    const r = {coords: [], ends: [], data: '', dataFonte: '', textoPagina: '', textoTarja: '', tarjaLimpa: '', avisos: []};
+    if(isFinite(o.lat) && isFinite(o.lon)){ REF_PADRAO.lat = o.lat; REF_PADRAO.lon = o.lon; }
+    const plausivel = e => { const rua = String(e.rua || e.texto || '').split(' - ')[0]; const sem = rua.replace(/\s/g, '');
+      return rua.length <= 60 && !/[^A-Za-zÀ-ÿ0-9 .,'\-]/.test(rua) && (rua.match(/[A-Za-zÀ-ÿ]{4,}/g) || []).length >= 1 && sem.length > 0 && (rua.match(/[A-Za-zÀ-ÿ]/g) || []).length / sem.length > .85 && !/^[A-Z\s.]{12,}$/.test(rua.replace(/^(R\.|Rua|Av\.?)\s*/, '')) && !/\s(de|da|do|das|dos|e)$/i.test(rua.replace(/,.*$/, '').trim()); };   // “Rua Aristóteles da” = cortado
+    const addEnd = (fonte, e) => { if(e && e.texto && plausivel(e) && !r.ends.some(x => x.texto.toLowerCase() === e.texto.toLowerCase())) r.ends.push({fonte, texto: e.texto, voto: /votação|2ª/.test(fonte) ? 2 : /Texto/.test(fonte) ? 1 : 0}); };
+    const addCoord = (fonte, c, nota) => { if(c && noBrasil(c.lat, c.lon) && !r.coords.some(x => dist(x.lat, x.lon, c.lat, c.lon) < 5 && x.fonte === fonte)) r.coords.push({fonte, lat: c.lat, lon: c.lon, nota: nota || ''}); };
+    // 1. texto completo
+    st('Lendo o texto: ' + file.name);
+    const w = await motorOCR();
+    const cv = await canvasDe(file, 2400);
+    await w.setParameters({tessedit_pageseg_mode: '3', preserve_interword_spaces: '1', tessedit_char_whitelist: ''});
+    let res = await w.recognize(cv), modo = 'documento';
+    if(semEsp(res.data.text) < 40){   // foto: o modo automático não acha blocos de texto → texto espalhado
+      await w.setParameters({tessedit_pageseg_mode: '11'});
+      const r2 = await w.recognize(cv);
+      if(semEsp(r2.data.text) > semEsp(res.data.text)){ res = r2; modo = 'foto'; }
+    }
+    if(modo === 'foto'){
+      // texto solto na foto: o leitor “vê” letras no asfalto, muro e céu → fica só o que leu com segurança
+      const boas = (res.data.lines || []).map(l => ({t: String(l.text || '').replace(/\s+/g, ' ').trim(), c: l.confidence || 0}))
+        .filter(l => { const an = (l.t.match(/[A-Za-zÀ-ÿ0-9]/g) || []).length; return l.c >= 70 && an >= 4 && an / l.t.length > .7 && /[A-Za-zÀ-ÿ]{3,}|\d{2}/.test(l.t); });
+      r.descartadas = (res.data.lines || []).length - boas.length;
+      r.textoPagina = boas.map(l => l.t).join('\n');
+    }else r.textoPagina = (res.data.text || '').replace(/[ \t]+\n/g, '\n').replace(/\n{3,}/g, '\n\n').trim();
+    r.confianca = Math.round(res.data.confidence || 0); r.modo = modo;
+    if(parar) return r;
+    // 2. localização (opcional)
+    if(o.geo){
+      try{
+        const ex = await lerExif(file);
+        if(ex.lat != null) addCoord(ex.via === 'prop' ? 'Propriedades do arquivo' : 'GPS gravado na foto', ex);
+        if(ex.data){ r.data = ex.data; r.dataFonte = 'propriedades do arquivo'; }
+        const p = ex.props || {}; const tp = Object.keys(p).filter(k => k !== 'camera' && k !== 'programa').map(k => p[k]).join('\n');
+        if(tp) addEnd('Propriedades do arquivo', lerEnderecoTarja(tp) || window.ge16.lerEndereco(tp));
+      }catch(e){ console.warn('propriedades:', e); }
+      const n = file.name.replace(/\.[^.]+$/, '').replace(/_+/g, ' ').trim();
+      addCoord('Nome do arquivo', lerCoordenadas(n) || (window.__geCoordsEspaco && window.__geCoordsEspaco(n)));
+      addEnd('Nome do arquivo', window.ge16.lerEndereco(n) || lerEnderecoTarja(n));
+      const cp = window.__ge03.candidatos(r.textoPagina)[0]; if(cp) addCoord('Texto da imagem', cp, 'confira');
+      addEnd('Texto da imagem', window.ge16.lerEndereco(r.textoPagina));
+      st('Lendo a tarja (1ª leitura): ' + file.name);
+      const t = await textoDaFoto(file);
+      r.textoTarja = t.trim();
+      const c = lerCoordenadas(t), info = window.__ge03.INFO.get(file) || {};
+      const kmRef = x => dist(REF_PADRAO.lat, REF_PADRAO.lon, x.lat, x.lon) / 1000;
+      const longe = c && kmRef(c) > 15;   // ex.: 22,9317 em vez de 22,5317 (5 lido como 9)
+      if(c) addCoord('Tarja — 1ª leitura', c, longe ? 'a ' + Math.round(kmRef(c)) + ' km da região de referência: provável número lido errado' : (info.unico ? 'lida uma vez só: confira' : ''));
+      addEnd('Tarja — votação', window.ge16.lerEndereco(t)); addEnd('Tarja — 1ª leitura', lerEnderecoTarja(t));
+      const d = lerDataTarja(t); if(d && !r.data){ r.data = d; r.dataFonte = 'tarja'; }
+      if((!c || longe || o.sempre) && !parar){
+        st('2ª leitura da tarja (recortes extras): ' + file.name);
+        const lido = await window.__ocrLerDeNovo(w, file);
+        if(lido.texto.trim()) r.textoTarja += '\n' + lido.texto.trim();
+        const g = lido.grupos.filter(x => noBrasil(x.lat, x.lon));
+        if(g.length && g[0].lista.length >= 2 && (g.length === 1 || g[0].pontos >= 2 * g[1].pontos)) addCoord('Tarja — 2ª leitura', g[0], g[0].lista.length + ' leituras iguais');
+        else if(g.length === 1) addCoord('Tarja — 2ª leitura', g[0], 'lida uma vez só: confira');
+        else if(g.length >= 2) r.avisos.push('2ª leitura: coordenadas diferentes (' + g.slice(0, 3).map(x => fmt(x.lat) + ', ' + fmt(x.lon)).join(' | ') + '): confira na imagem.');
+        addEnd('Tarja — 2ª leitura', window.ge16.lerEndereco(t + '\n' + lido.texto));
+        if(!r.data){ const d2 = lerDataTarja(lido.texto); if(d2){ r.data = d2; r.dataFonte = 'tarja (2ª leitura)'; } }
+      }
+      // nenhuma coordenada na região (a releitura ampliada às vezes lê “22,5317S” como 22,9317 várias vezes):
+      // procura linha por linha em todo o texto lido e fica com a que cai na região, se houver
+      if(!r.coords.some(x => kmRef(x) <= 15)){
+        const grupos = [];
+        (r.textoTarja + '\n' + r.textoPagina).split('\n').forEach(l => window.__ge03.candidatos(l).forEach(x => {
+          if(!noBrasil(x.lat, x.lon) || kmRef(x) > 15) return;
+          const g = grupos.find(y => Math.abs(y.lat - x.lat) < 3e-4 && Math.abs(y.lon - x.lon) < 3e-4); if(g) g.n++; else grupos.push({lat: x.lat, lon: x.lon, n: 1});
+        }));
+        grupos.sort((a, b) => b.n - a.n);
+        if(grupos.length) addCoord('Tarja — linhas lidas na região', grupos[0], grupos[0].n + ' leitura(s)' + (grupos[0].n < 2 ? ': confira' : '') + '; as outras leituras caíram longe');
+      }
+      r.tarjaLimpa = consolidar(r.textoTarja);
+      r.coords.forEach(c => { const km = dist(REF_PADRAO.lat, REF_PADRAO.lon, c.lat, c.lon) / 1000; if(km > 15 && !/km da região/.test(c.nota)) c.nota = (c.nota ? c.nota + '; ' : '') + 'a ' + Math.round(km) + ' km da região de referência'; });
+      if(r.coords.length >= 2){ const a = r.coords[0]; if(r.coords.some(x => dist(a.lat, a.lon, x.lat, x.lon) > 150)) r.avisos.push('As fontes dão coordenadas diferentes (mais de 150 m): confira qual está certa.'); }
+      r.ends.sort((x, y) => (y.voto || 0) - (x.voto || 0));
+    }
+    return r;
+  }
+  /* texto editável: o texto da imagem + as linhas da tarja que ele não tem */
+  function textoInicial(r){
+    let t = r.textoPagina || '';
+    const K = x => semAcento(x).toLowerCase().replace(/[^a-z0-9]/g, '');
+    if(r.tarjaLimpa){
+      const k = semAcento(t).toLowerCase().replace(/[^a-z0-9]/g, '');
+      const novas = r.tarjaLimpa.split('\n').filter(l => { const x = semAcento(l).toLowerCase().replace(/[^a-z0-9]/g, ''); return x.length >= 4 && !k.includes(x); });
+      if(r.modo === 'foto' && novas.length){ t = r.tarjaLimpa + (t ? '\n\n[outros textos soltos na imagem]\n' + t : ''); }
+      else if(novas.length) t += (t ? '\n\n' : '') + '[tarja]\n' + novas.join('\n');
+    }
+    // dados reconhecidos que não aparecem no texto (as várias leituras da tarja saíram diferentes) → no topo, marcados
+    const c = melhorCoord(r), e = r.ends && r.ends[0], kt = K(t), extra = [];
+    if(e && !kt.includes(K(e.texto.split(' - ')[0]))) extra.push(e.texto);
+    if(c && !kt.includes(String(Math.abs(c.lat).toFixed(4)).replace('.', ''))) extra.push(Math.abs(c.lat).toFixed(6) + '°' + (c.lat < 0 ? 'S' : 'N') + ', ' + Math.abs(c.lon).toFixed(6) + '°' + (c.lon < 0 ? 'W' : 'E'));
+    if(r.data && !/\d{1,2}:\d{2}/.test(t)) extra.push(new Date(r.data).toLocaleString('pt-BR'));
+    if(extra.length) t = '[reconhecido pelo programa]\n' + extra.join('\n') + (t ? '\n\n' + t : '');
+    return t;
+  }
+  const melhorCoord = r => r && r.coords.find(c => !/km da região/.test(c.nota)) || null;   // só a que cai na região; a de longe é “suspeita”
+  const suspeita = r => r && !melhorCoord(r) && r.coords[0] || null;
+  const temGeo = it => it.r && (melhorCoord(it.r) || it.r.ends.length);
+  function desenhar(){
+    const el = $('lista');
+    el.innerHTML = ITENS.map(it => {
+      const r = it.r; let corpo = '<p class="ajuda">Ainda não lida.</p>';
+      if(r){
+        const c = melhorCoord(r), e = r.ends[0], sus = suspeita(r);
+        corpo = '<div class="linha" style="justify-content:space-between;align-items:center"><span class="ajuda" style="margin:0">' + (r.modo === 'foto' ? 'Foto (texto solto)' : 'Documento') + ' · confiança da leitura ' + r.confianca + '%' + (r.descartadas ? ' · ' + r.descartadas + ' trecho(s) ilegível(is) descartado(s)' : '') + '</span>' +
+          '<span><button type="button" class="bt peq" data-acao="copiar">Copiar texto</button> <button type="button" class="bt peq" data-acao="baixar">⬇ .txt</button> <button type="button" class="bt peq" data-acao="original">Restaurar leitura</button></span></div>' +
+          '<textarea class="texto" data-texto aria-label="Texto lido de ' + esc(it.file.name) + '">' + esc(it.texto) + '</textarea>' +
+          r.avisos.map(a => '<div class="msg warn">' + esc(a) + '</div>').join('');
+        if(c || e || sus){
+          corpo += '<div class="geo"><div class="t">📍 Esta imagem tem ' + (c ? 'coordenada' : sus ? 'coordenada (suspeita)' : '') + ((c || sus) && e ? ' e ' : '') + (e ? 'endereço' : '') + '. Quer georreferenciar no Google Earth?</div>' +
+            '<div class="chave"><span class="k">Coordenada</span><span>' + (sus ? '<span class="pill warn">suspeita — confira na foto</span> ' + fmt(sus.lat) + ', ' + fmt(sus.lon) + ' <span class="ajuda">(' + esc(sus.fonte) + ' · ' + esc(sus.nota) + '; provavelmente um número lido errado. Não entra no KMZ.)</span>' : c ? '<b>' + fmt(c.lat) + ', ' + fmt(c.lon) + '</b> <span class="ajuda">(' + esc(c.fonte) + (c.nota ? ' · ' + esc(c.nota) : '') + ')</span> <button type="button" class="bt peq" data-copiar="' + fmt(c.lat) + ', ' + fmt(c.lon) + '">Copiar</button>' : '— <span class="ajuda">(sem coordenada: o Google Earth procura pelo endereço)</span>') + '</span>' +
+            '<span class="k">Endereço</span><span>' + (e ? '<b>' + esc(e.texto) + '</b> <span class="ajuda">(' + esc(e.fonte) + ')</span>' : '—') + '</span>' +
+            '<span class="k">Data</span><span>' + (r.data ? esc(new Date(r.data).toLocaleString('pt-BR')) + ' <span class="ajuda">(' + esc(r.dataFonte) + ')</span>' : '—') + '</span></div>' +
+            '<div class="linha">' + '<a class="bt peq" target="_blank" rel="noopener" href="https://earth.google.com/web/search/' + encodeURIComponent(c ? fmt(c.lat) + ',' + fmt(c.lon) : e ? e.texto + ', Rio das Ostras - RJ' : fmt(sus.lat) + ',' + fmt(sus.lon)) + '">🌍 Ver no Google Earth Web</a>' +
+            (c ? '<label class="ajuda" style="margin:0;display:flex;gap:6px;align-items:center"><input type="checkbox" data-geo ' + (it.geo ? 'checked' : '') + '> incluir no KMZ</label>' : '<span class="ajuda" style="margin:0">Para entrar no KMZ precisa de coordenada (use o programa <a href="https://totalcivil.com.br/googleearth/" target="_blank" rel="noopener">Imagens GoogleEarth</a>, que acha o ponto pelo endereço).</span>') + '</div>' +
+            ((r.coords.length + r.ends.length) > 2 ? '<details><summary>O que cada fonte achou</summary><table class="fontes"><tr><th>Fonte</th><th>Achou</th></tr>' +
+              r.coords.map(x => '<tr><td>' + esc(x.fonte) + '</td><td>' + fmt(x.lat) + ', ' + fmt(x.lon) + (x.nota ? ' <span class="ajuda">(' + esc(x.nota) + ')</span>' : '') + '</td></tr>').join('') +
+              r.ends.map(x => '<tr><td>' + esc(x.fonte) + '</td><td>' + esc(x.texto) + '</td></tr>').join('') + '</table></details>' : '') + '</div>';
+        }
+        if(r.textoTarja) corpo += '<details><summary>Todas as leituras da tarja (texto bruto)</summary><pre>' + esc(r.textoTarja) + '</pre></details>';
+      }
+      return '<div class="res" data-id="' + it.id + '"><img src="' + (it.thumb || it.url) + '" alt="' + esc(it.file.name) + '"><div><div class="linha" style="justify-content:space-between"><div class="nome">' + esc(it.file.name) + '</div><button type="button" class="bt peq" data-acao="remover">Remover</button></div>' + corpo + '</div></div>';
+    }).join('');
+    const lidas = ITENS.filter(i => i.r).length, geo = ITENS.filter(i => i.r && melhorCoord(i.r));
+    $('bt-csv').disabled = $('bt-txt').disabled = !lidas;
+    $('geo-cartao').hidden = !ITENS.some(temGeo);
+    $('geo-txt').textContent = geo.length + ' imagem(ns) com coordenada' + (ITENS.filter(i => i.r && !melhorCoord(i.r) && i.r.ends.length).length ? ' e ' + ITENS.filter(i => i.r && !melhorCoord(i.r) && i.r.ends.length).length + ' só com endereço' : '') + '. Marque “incluir no KMZ” nas que quiser e gere o arquivo.';
+  }
+  async function lerTodas(){
+    if(rodando) return; rodando = true; parar = false;
+    const o = opcoes(), chave = JSON.stringify([o.geo, o.sempre]), fila = ITENS.filter(i => !i.r || i.chave !== chave);
+    $('bt-ler').disabled = true; $('bt-parar').hidden = false; prog(0);
+    const t0 = Date.now(); let feitas = 0, erro = '';
+    try{
+      st('Carregando o leitor de texto… (na primeira vez baixa cerca de 10 MB)');
+      await motorOCR();
+      for(const it of fila){
+        if(parar) break;
+        try{ it.r = await lerImagem(it.file, o); it.chave = chave; it.texto = textoInicial(it.r); }
+        catch(e){ console.error(e); it.r = {coords: [], ends: [], avisos: ['Erro ao ler: ' + (e.message || e)], textoPagina: '', textoTarja: '', confianca: 0}; it.texto = ''; if(/leitor de texto/.test(e.message || '')){ erro = e.message; break; } }
+        feitas++; prog(feitas / fila.length); desenhar();
+      }
+    }catch(e){ erro = e.message || String(e); }
+    finally{ rodando = false; $('bt-ler').disabled = !ITENS.length; $('bt-parar').hidden = true; prog(null); }
+    const geo = ITENS.filter(temGeo).length;
+    st(erro ? 'Erro: ' + erro : (parar ? 'Parado. ' : '') + feitas + ' imagem(ns) lida(s) em ' + Math.round((Date.now() - t0) / 1000) + ' s.' + (geo ? ' ' + geo + ' com coordenada ou endereço: veja “Georreferenciar no Google Earth”.' : ''));
+  }
+  function baixar(nome, conteudo, tipo){
+    const a = document.createElement('a'); a.href = URL.createObjectURL(conteudo instanceof Blob ? conteudo : new Blob([conteudo], {type: tipo})); a.download = nome; document.body.appendChild(a); a.click();
+    setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 2000);
+  }
+  const hoje = () => new Date().toISOString().slice(0, 10);
+  const base = n => n.replace(/\.[^.]+$/, '');
+  $('bt-txt').onclick = () => baixar('Textos_OCR_' + hoje() + '.txt', '﻿' + ITENS.filter(i => i.r).map(i => '===== ' + i.file.name + ' =====\n' + i.texto).join('\n\n'), 'text/plain;charset=utf-8');
+  $('bt-csv').onclick = () => {
+    const q = v => '"' + String(v == null ? '' : v).replace(/"/g, '""') + '"';
+    const linhas = [['Arquivo', 'Texto', 'Latitude', 'Longitude', 'Fonte da coordenada', 'Endereço', 'Data'].map(q).join(';')];
+    ITENS.filter(i => i.r).forEach(i => { const c = melhorCoord(i.r), e = i.r.ends[0];
+      linhas.push([i.file.name, i.texto, c ? fmt(c.lat).replace('.', ',') : '', c ? fmt(c.lon).replace('.', ',') : '', c ? c.fonte : '', e ? e.texto : '', i.r.data ? new Date(i.r.data).toLocaleString('pt-BR') : ''].map(q).join(';')); });
+    baixar('Leitura_OCR_' + hoje() + '.csv', '﻿' + linhas.join('\r\n'), 'text/csv;charset=utf-8');
+  };
+  /* KMZ: um ponto por imagem marcada, com a foto (reduzida) e o texto lido */
+  const xml = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&apos;'}[c]));
+  async function fotoReduzida(blob){
+    const bmp = await abrirImagem(blob), k = Math.min(1, 1024 / Math.max(bmp.width, bmp.height));
+    const c = document.createElement('canvas'); c.width = Math.round(bmp.width * k); c.height = Math.round(bmp.height * k);
+    c.getContext('2d').drawImage(bmp, 0, 0, c.width, c.height); if(bmp.close) bmp.close();
+    return await new Promise(ok => c.toBlob(ok, 'image/jpeg', .8));
+  }
+  $('bt-kmz').onclick = async () => {
+    const lista = ITENS.filter(i => i.r && i.geo && melhorCoord(i.r));
+    if(!lista.length){ st('Nenhuma imagem com coordenada marcada para o KMZ.'); return; }
+    if(typeof JSZip === 'undefined'){ st('O compactador não carregou (internet). Tente de novo.'); return; }
+    if(lista.length > 50) st('Atenção: o Google Earth Web aceita até 50 fotos por importação; só as 50 primeiras entram neste arquivo.');
+    const pasta = ($('kmz-nome').value || 'Leitura OCR').trim(), z = new JSZip(), pms = [];
+    for(const [k, it] of lista.slice(0, 50).entries()){
+      const c = melhorCoord(it.r), e = it.r.ends[0], arq = 'files/foto_' + (k + 1) + '.jpg';
+      z.file(arq, await fotoReduzida(it.file));
+      const desc = '<img src="' + arq + '" width="400"><br>' + (e ? '<b>' + xml(e.texto) + '</b><br>' : '') + (it.r.data ? xml(new Date(it.r.data).toLocaleString('pt-BR')) + '<br>' : '') + '<pre>' + xml(it.texto) + '</pre><small>Coordenada: ' + xml(c.fonte) + '</small>';
+      pms.push('<Placemark><name>' + xml(e ? e.texto.split(' - ')[0] : base(it.file.name)) + '</name><description><![CDATA[' + desc.replace(/]]>/g, ']]&gt;') + ']]></description><Point><coordinates>' + c.lon.toFixed(7) + ',' + c.lat.toFixed(7) + ',0</coordinates></Point></Placemark>');
+    }
+    z.file('doc.kml', '<?xml version="1.0" encoding="UTF-8"?>\n<kml xmlns="http://www.opengis.net/kml/2.2"><Document><name>' + xml(pasta) + '</name><Folder><name>' + xml(pasta) + '</name>' + pms.join('') + '</Folder></Document></kml>');
+    const blob = await z.generateAsync({type: 'blob', compression: 'STORE'});
+    baixar(pasta.replace(/[^\wÀ-ÿ -]+/g, '_') + '.kmz', blob);
+    st('KMZ gerado com ' + pms.length + ' ponto(s). No Google Earth Web: + Novo › Importar arquivo KML.');
+  };
+  $('bt-limpar').onclick = () => { if(rodando) return; ITENS.splice(0).forEach(i => URL.revokeObjectURL(i.url)); desenhar(); $('bt-ler').disabled = true; st(''); };
+  $('bt-ler').onclick = lerTodas;
+  $('bt-parar').onclick = () => { parar = true; st('Parando depois da imagem atual…'); };
+  $('bt-anexar').onclick = () => $('in-img').click();
+  $('in-img').onchange = e => { adicionar(e.target.files); e.target.value = ''; };
+  const solta = $('solta');
+  ['dragenter', 'dragover'].forEach(ev => solta.addEventListener(ev, e => { e.preventDefault(); solta.classList.add('sobre'); }));
+  ['dragleave', 'drop'].forEach(ev => solta.addEventListener(ev, e => { e.preventDefault(); solta.classList.remove('sobre'); }));
+  solta.addEventListener('drop', e => adicionar(e.dataTransfer.files));
+  document.addEventListener('paste', e => { const fs = [...(e.clipboardData || {}).files || []]; if(fs.length) adicionar(fs); });   // Ctrl+V de um print
+  const itemDe = el => { const card = el.closest('.res'); return card && ITENS.find(i => i.id === card.dataset.id); };
+  $('lista').addEventListener('input', e => { if(e.target.matches('[data-texto]')){ const it = itemDe(e.target); if(it) it.texto = e.target.value; } });
+  $('lista').addEventListener('change', e => { if(e.target.matches('[data-geo]')){ const it = itemDe(e.target); if(it) it.geo = e.target.checked; } });
+  $('lista').addEventListener('click', e => {
+    const it = itemDe(e.target); if(!it) return;
+    if(e.target.matches('img')){ const v = $('visor'), im = v.firstElementChild; im.onerror = () => { im.onerror = null; im.src = it.thumb; }; im.src = it.url; v.hidden = false; return; }
+    if(e.target.dataset.copiar){ navigator.clipboard.writeText(e.target.dataset.copiar).then(() => st('Coordenada copiada.')); return; }
+    const ac = e.target.dataset.acao;
+    if(ac === 'copiar') navigator.clipboard.writeText(it.texto).then(() => st('Texto copiado.'));
+    if(ac === 'baixar') baixar(base(it.file.name) + '.txt', '﻿' + it.texto, 'text/plain;charset=utf-8');
+    if(ac === 'original' && it.r){ it.texto = textoInicial(it.r); desenhar(); }
+    if(ac === 'remover' && !rodando){ URL.revokeObjectURL(it.url); ITENS.splice(ITENS.indexOf(it), 1); desenhar(); $('bt-ler').disabled = !ITENS.length; }
+  });
+  $('visor').onclick = () => { $('visor').hidden = true; };
+  window.__leitor = {ITENS, lerImagem, opcoes, consolidar};
+})();
+</script>
+</body>
+</html>
