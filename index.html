@@ -123,7 +123,7 @@ try{
   <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><span id="tc-usuario" style="font-size:12.5px;color:rgba(255,255,255,.8)"></span><button type="button" class="tbt" id="tc-sair" hidden>Sair</button><a class="tbt" href="https://totalcivil.com.br/">Total Civil</a></div>
 </div></header>
 <main>
-<p class="intro">Anexe imagens (documentos fotografados, prints, placas, fotos de campo com tarja). O programa lê <b>todo o texto</b> de cada imagem e coloca numa caixa de texto que você pode <b>editar, copiar e baixar</b>.
+<p class="intro">Funciona com fotos de qualquer cidade do Brasil. Anexe imagens (documentos fotografados, prints, placas, fotos de campo com tarja). O programa lê <b>todo o texto</b> de cada imagem e coloca numa caixa de texto que você pode <b>editar, copiar e baixar</b>.
 Se a imagem tiver <b>coordenadas ou endereço</b> (tarja do Timemark, GPS Map Camera, GPS gravado na foto, nome do arquivo), ele mostra o que achou e pergunta se você quer <b>georreferenciar no Google Earth</b>.
 Tudo é lido aqui no seu computador: as imagens não são enviadas para nenhum servidor.</p>
 
@@ -140,10 +140,14 @@ Tudo é lido aqui no seu computador: as imagens não são enviadas para nenhum s
       <label class="opcao"><input type="checkbox" id="op-sempre"><span><b>Fazer sempre a 2ª leitura da tarja</b><small>Mesmo quando a 1ª já achou a coordenada (para conferir). Mais lento.</small></span></label>
     </div>
     <div class="opcoes" style="flex:1;min-width:220px">
-      <span class="rot">Região de referência</span>
-      <div class="campo"><label for="ref-lat">Latitude</label><input id="ref-lat" value="-22.527" inputmode="decimal"></div>
-      <div class="campo"><label for="ref-lon">Longitude</label><input id="ref-lon" value="-41.945" inputmode="decimal"></div>
-      <p class="ajuda" style="margin:0">Padrão: Rio das Ostras. Serve para completar coordenadas com símbolos perdidos e avisar quando uma leitura cai longe (mais de 50 km).</p>
+      <span class="rot">Região das fotos (opcional · todo o Brasil)</span>
+      <div class="campo"><label for="ref-coord">Coordenada de referência</label><input id="ref-coord" placeholder="Ex.: -22.527, -41.945" inputmode="decimal"></div>
+      <div class="linha">
+        <div class="campo" style="flex:1;min-width:90px"><label for="ref-raio">Raio limite (km)</label><input id="ref-raio" type="number" min="1" max="2000" step="1" value="30" inputmode="numeric"></div>
+        <div class="campo" style="flex:2;min-width:140px"><label for="ref-cidade">ou Cidade</label><input id="ref-cidade" placeholder="Ex.: Campinas - SP" autocomplete="address-level2"></div>
+      </div>
+      <p class="ajuda" style="margin:0">Coordenada lida fora do raio aparece como <b>suspeita</b> (número lido errado) e não entra no KMZ. Sem coordenada nem cidade, cada foto é lida duas vezes para conferir (mais lento). Vale a coordenada; sem ela, a cidade; sem as duas, o programa usa o GPS gravado nas fotos ou localiza no mapa o endereço lido na tarja. A cidade também ajuda a achar o endereço no Google Earth.</p>
+      <p class="ajuda" id="ref-status" style="margin:0"></p>
     </div>
   </div>
   <div class="linha" style="margin-top:12px">
@@ -876,8 +880,82 @@ progresso = function(){};   // sem barra de progresso do outro programa
   const prog = f => { const b = $('prog'); if(f == null){ b.hidden = true; return; } b.hidden = false; b.firstElementChild.style.width = Math.round(f * 100) + '%'; };
   const semEsp = t => String(t || '').replace(/\s/g, '').length;
   function opcoes(){
-    const n = v => parseFloat(String(v).replace(',', '.'));
-    return {geo: $('op-geo').checked, sempre: $('op-sempre').checked, lat: n($('ref-lat').value), lon: n($('ref-lon').value)};
+    const raio = parseFloat(String($('ref-raio').value).replace(',', '.'));
+    return {geo: $('op-geo').checked, sempre: $('op-sempre').checked, cidade: $('ref-cidade').value.trim(), coord: $('ref-coord').value.trim(), raio: raio > 0 ? raio : 30};
+  }
+  /* ---------- região das fotos (todo o Brasil) ----------
+     1) cidade digitada → localizada no mapa (OpenStreetMap; se falhar, Photon);
+     2) senão, mediana das coordenadas CONFIÁVEIS já lidas neste lote (GPS/propriedades/nome do arquivo ou 2+ leituras iguais);
+     3) sem nenhuma: não marca nada como suspeito (só confere se está no Brasil). */
+  let LIMITE_KM = 30;                           // raio limite (campo); padrão 30 km: 1º decimal lido errado (5→9) desloca ~44 km
+  const CENTRO_BR = {lat: -14.235, lon: -51.925};
+  let REGIAO = null; const CACHE_CIDADE = new Map();
+  async function regiaoDaCidade(nome){
+    if(!nome) return null; const k = nome.toLowerCase(); if(CACHE_CIDADE.has(k)) return CACHE_CIDADE.get(k);
+    let res = null;
+    const busca = async (url, ler) => { const r = await Promise.race([fetch(url, {headers: {'Accept': 'application/json'}}), new Promise((_, e) => setTimeout(() => e(new Error('tempo')), 12000))]); return ler(await r.json()); };
+    try{ res = await busca('https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&countrycodes=br&accept-language=pt-BR&q=' + encodeURIComponent(nome), j => j && j[0] ? {lat: +j[0].lat, lon: +j[0].lon, nome: j[0].display_name.split(',').slice(0, 3).join(',')} : null); }catch(e){}
+    if(!res){ try{ res = await busca('https://photon.komoot.io/api/?limit=1&lang=pt&q=' + encodeURIComponent(nome + ', Brasil'), j => { const f = j && j.features && j.features[0]; return f ? {lat: f.geometry.coordinates[1], lon: f.geometry.coordinates[0], nome: [f.properties.name, f.properties.state].filter(Boolean).join(', ')} : null; }); }catch(e){} }
+    if(res && !noBrasil(res.lat, res.lon)) res = null;
+    CACHE_CIDADE.set(k, res); return res;
+  }
+  // confiável = não depende do OCR (GPS, propriedades, nome do arquivo) ou foi confirmada por DUAS fontes diferentes da mesma foto
+  // (nas fotos de vistoria a 1ª leitura errou o mesmo número em 6 de 8 fotos: maioria não basta)
+  // nas fotos de vistoria a 1ª E a 2ª leitura erraram o mesmo número em algumas fotos: coordenada lida pelo OCR nunca define a região
+  const confiavel = c => /GPS|Propriedades|Nome do arquivo/.test(c.fonte);
+  function regiaoDasFotos(){
+    const pts = ITENS.map(i => i.r && (i.r.coords || []).find(confiavel)).filter(Boolean);
+    if(pts.length < 2) return null;
+    const med = a => a.slice().sort((x, y) => x - y)[Math.floor(a.length / 2)];
+    const m = {lat: med(pts.map(p => p.lat)), lon: med(pts.map(p => p.lon))};
+    const perto = pts.filter(p => dist(m.lat, m.lon, p.lat, p.lon) <= LIMITE_KM * 1000);
+    return perto.length >= 1 ? {lat: m.lat, lon: m.lon, nome: 'pelo GPS/arquivo das fotos (' + perto.length + '), raio ' + LIMITE_KM + ' km', fonte: 'fotos'} : null;
+  }
+  /* endereço escrito na tarja → localizado no mapa (o nome da rua não sofre a troca de números do OCR) */
+  const CACHE_END = new Map();
+  async function regiaoPeloEndereco(){
+    const cont = new Map();
+    ITENS.forEach(i => { const r = i.r; if(!r || !r.ends || !r.ends[0] || !/tarja|Texto/i.test(r.ends[0].fonte)) return;
+      const rua = r.ends[0].texto.split(' - ')[0].replace(/,\s*\d+\s*$/, ''), bairro = r.ends[0].texto.split(' - ')[1] || '';
+      const q = [rua, bairro, r.cidade || $('ref-cidade').value.trim()].filter(Boolean).join(', ');
+      cont.set(q, (cont.get(q) || 0) + 1); });
+    for(const [q] of [...cont.entries()].sort((a, b) => b[1] - a[1]).slice(0, 2)){
+      if(!CACHE_END.has(q)){ let res = null; try{ res = await regiaoDaCidade(q); }catch(e){} CACHE_END.set(q, res); }
+      const res = CACHE_END.get(q);
+      if(res) return {lat: res.lat, lon: res.lon, nome: 'pelo endereço lido (“' + q + '”), raio ' + LIMITE_KM + ' km', fonte: 'endereco'};
+    }
+    return null;
+  }
+  function mostrarRegiao(){
+    $('ref-status').textContent = REGIAO ? 'Região usada: ' + REGIAO.nome + ' — ' + fmt(REGIAO.lat).slice(0, 8) + ', ' + fmt(REGIAO.lon).slice(0, 8) + '.' : 'Região ainda não conhecida: nenhuma coordenada é marcada como suspeita.';
+  }
+  /* marca coordenadas longe da região e, se nenhuma cair nela, procura linha por linha no texto lido (refeito no fim do lote) */
+  function avaliarRegiao(r){
+    if(!r || !r.coords) return;
+    r.coords = r.coords.filter(c => !c.daRegiao);
+    r.coords.forEach(c => { c.nota = c.base || ''; });
+    if(!REGIAO) return;
+    const km = c => dist(REGIAO.lat, REGIAO.lon, c.lat, c.lon) / 1000;
+    if(!r.coords.some(c => km(c) <= LIMITE_KM)){
+      const grupos = [];
+      ((r.textoTarja || '') + '\n' + (r.textoPagina || '')).split('\n').forEach(l => window.__ge03.candidatos(l).forEach(x => {
+        if(!noBrasil(x.lat, x.lon) || km(x) > LIMITE_KM) return;
+        const g = grupos.find(y => Math.abs(y.lat - x.lat) < 3e-4 && Math.abs(y.lon - x.lon) < 3e-4); if(g) g.n++; else grupos.push({lat: x.lat, lon: x.lon, n: 1});
+      }));
+      grupos.sort((a, b) => b.n - a.n);
+      if(grupos.length) r.coords.push({fonte: 'Tarja — linhas lidas na região', lat: grupos[0].lat, lon: grupos[0].lon, base: grupos[0].n + ' leitura(s)' + (grupos[0].n < 2 ? ': confira' : '') + '; as outras leituras caíram longe', nota: '', daRegiao: true});
+    }
+    r.coords.forEach(c => { c.nota = c.base || ''; const k = km(c); if(k > LIMITE_KM) c.nota = (c.nota ? c.nota + '; ' : '') + 'a ' + Math.round(k) + ' km da referência (limite ' + LIMITE_KM + ' km): provável número lido errado'; });
+  }
+  /* cidade escrita na tarja: “Rio das Ostras - RJ”, “Campinas/SP”, “Belo Horizonte, MG” */
+  const UFS = 'AC|AL|AP|AM|BA|CE|DF|ES|GO|MA|MT|MS|MG|PA|PB|PR|PE|PI|RJ|RN|RS|RO|RR|SC|SP|SE|TO';
+  function cidadeDoTexto(t){
+    const re = new RegExp("(?:^|[,|]|\\s-\\s|\\s{2,})\\s*([A-ZÀ-Ý][A-Za-zÀ-ÿ'.]+(?:\\s+(?:de|da|do|das|dos|d'|[A-ZÀ-Ý][A-Za-zÀ-ÿ'.]+)){0,4})\\s*(?:-|–|\\/|,)?\\s*(" + UFS + ")\\b(?![a-z])", 'g');
+    const cont = new Map();
+    String(t || '').split('\n').forEach(l => { let m; re.lastIndex = 0; while((m = re.exec(l))){
+      const nome = m[1].replace(/\s+/g, ' ').trim(); if(/^(Rua|R|Av|Avenida|Travessa|Estrada|Rodovia|Alameda|Pra[çc]a|Brasil|Bairro|Jardim|Vila|Centro)$/i.test(nome.split(' ')[0]) || nome.length < 3) continue;
+      const k = nome + ' - ' + m[2]; cont.set(k, (cont.get(k) || 0) + 1); } });
+    return [...cont.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] || '';
   }
   function adicionar(files){
     [...files].filter(f => /^image\//.test(f.type) || /\.(jpe?g|png|webp|bmp|gif)$/i.test(f.name)).forEach(file => {
@@ -909,11 +987,11 @@ progresso = function(){};   // sem barra de progresso do outro programa
   }
   async function lerImagem(file, o){
     const r = {coords: [], ends: [], data: '', dataFonte: '', textoPagina: '', textoTarja: '', tarjaLimpa: '', avisos: []};
-    if(isFinite(o.lat) && isFinite(o.lon)){ REF_PADRAO.lat = o.lat; REF_PADRAO.lon = o.lon; }
+    const ref = REGIAO || CENTRO_BR; REF_PADRAO.lat = ref.lat; REF_PADRAO.lon = ref.lon;   // âncora da leitura tolerante e do hemisfério
     const plausivel = e => { const rua = String(e.rua || e.texto || '').split(' - ')[0]; const sem = rua.replace(/\s/g, '');
       return rua.length <= 60 && !/[^A-Za-zÀ-ÿ0-9 .,'\-]/.test(rua) && (rua.match(/[A-Za-zÀ-ÿ]{4,}/g) || []).length >= 1 && sem.length > 0 && (rua.match(/[A-Za-zÀ-ÿ]/g) || []).length / sem.length > .85 && !/^[A-Z\s.]{12,}$/.test(rua.replace(/^(R\.|Rua|Av\.?)\s*/, '')) && !/\s(de|da|do|das|dos|e)$/i.test(rua.replace(/,.*$/, '').trim()); };   // “Rua Aristóteles da” = cortado
     const addEnd = (fonte, e) => { if(e && e.texto && plausivel(e) && !r.ends.some(x => x.texto.toLowerCase() === e.texto.toLowerCase())) r.ends.push({fonte, texto: e.texto, voto: /votação|2ª/.test(fonte) ? 2 : /Texto/.test(fonte) ? 1 : 0}); };
-    const addCoord = (fonte, c, nota) => { if(c && noBrasil(c.lat, c.lon) && !r.coords.some(x => dist(x.lat, x.lon, c.lat, c.lon) < 5 && x.fonte === fonte)) r.coords.push({fonte, lat: c.lat, lon: c.lon, nota: nota || ''}); };
+    const addCoord = (fonte, c, nota) => { if(c && noBrasil(c.lat, c.lon) && !r.coords.some(x => dist(x.lat, x.lon, c.lat, c.lon) < 5 && x.fonte === fonte)) r.coords.push({fonte, lat: c.lat, lon: c.lon, base: nota || '', nota: nota || ''}); };
     // 1. texto completo
     st('Lendo o texto: ' + file.name);
     const w = await motorOCR();
@@ -952,12 +1030,12 @@ progresso = function(){};   // sem barra de progresso do outro programa
       const t = await textoDaFoto(file);
       r.textoTarja = t.trim();
       const c = lerCoordenadas(t), info = window.__ge03.INFO.get(file) || {};
-      const kmRef = x => dist(REF_PADRAO.lat, REF_PADRAO.lon, x.lat, x.lon) / 1000;
-      const longe = c && kmRef(c) > 15;   // ex.: 22,9317 em vez de 22,5317 (5 lido como 9)
-      if(c) addCoord('Tarja — 1ª leitura', c, longe ? 'a ' + Math.round(kmRef(c)) + ' km da região de referência: provável número lido errado' : (info.unico ? 'lida uma vez só: confira' : ''));
+      const longe = c && REGIAO && dist(REGIAO.lat, REGIAO.lon, c.lat, c.lon) > LIMITE_KM * 1000;   // ex.: 22,9317 em vez de 22,5317 (5 lido como 9)
+      if(c) addCoord('Tarja — 1ª leitura', c, info.unico ? 'lida uma vez só: confira' : '');
       addEnd('Tarja — votação', window.ge16.lerEndereco(t)); addEnd('Tarja — 1ª leitura', lerEnderecoTarja(t));
       const d = lerDataTarja(t); if(d && !r.data){ r.data = d; r.dataFonte = 'tarja'; }
-      if((!c || longe || o.sempre) && !parar){
+      // sem região informada (coordenada/cidade) a 2ª leitura sempre roda para conferir: sozinha, a 1ª leitura chegou a errar o mesmo número em 6 de 8 fotos
+      if((!c || longe || o.sempre || !(REGIAO && REGIAO.fonte === 'fixa')) && !parar){
         st('2ª leitura da tarja (recortes extras): ' + file.name);
         const lido = await window.__ocrLerDeNovo(w, file);
         if(lido.texto.trim()) r.textoTarja += '\n' + lido.texto.trim();
@@ -968,22 +1046,20 @@ progresso = function(){};   // sem barra de progresso do outro programa
         addEnd('Tarja — 2ª leitura', window.ge16.lerEndereco(t + '\n' + lido.texto));
         if(!r.data){ const d2 = lerDataTarja(lido.texto); if(d2){ r.data = d2; r.dataFonte = 'tarja (2ª leitura)'; } }
       }
-      // nenhuma coordenada na região (a releitura ampliada às vezes lê “22,5317S” como 22,9317 várias vezes):
-      // procura linha por linha em todo o texto lido e fica com a que cai na região, se houver
-      if(!r.coords.some(x => kmRef(x) <= 15)){
-        const grupos = [];
-        (r.textoTarja + '\n' + r.textoPagina).split('\n').forEach(l => window.__ge03.candidatos(l).forEach(x => {
-          if(!noBrasil(x.lat, x.lon) || kmRef(x) > 15) return;
-          const g = grupos.find(y => Math.abs(y.lat - x.lat) < 3e-4 && Math.abs(y.lon - x.lon) < 3e-4); if(g) g.n++; else grupos.push({lat: x.lat, lon: x.lon, n: 1});
-        }));
-        grupos.sort((a, b) => b.n - a.n);
-        if(grupos.length) addCoord('Tarja — linhas lidas na região', grupos[0], grupos[0].n + ' leitura(s)' + (grupos[0].n < 2 ? ': confira' : '') + '; as outras leituras caíram longe');
-      }
       r.tarjaLimpa = consolidar(r.textoTarja);
-      r.coords.forEach(c => { const km = dist(REF_PADRAO.lat, REF_PADRAO.lon, c.lat, c.lon) / 1000; if(km > 15 && !/km da região/.test(c.nota)) c.nota = (c.nota ? c.nota + '; ' : '') + 'a ' + Math.round(km) + ' km da região de referência'; });
       if(r.coords.length >= 2){ const a = r.coords[0]; if(r.coords.some(x => dist(a.lat, a.lon, x.lat, x.lon) > 150)) r.avisos.push('As fontes dão coordenadas diferentes (mais de 150 m): confira qual está certa.'); }
+      { // a mesma tarja lida com números diferentes (ex.: 22,5316 e 22,9316): avisa com as duas versões
+        const gs = [];
+        (r.textoTarja + '\n' + r.textoPagina).split('\n').forEach(l => window.__ge03.candidatos(l).forEach(x => { if(!noBrasil(x.lat, x.lon)) return;
+          const g = gs.find(y => dist(y.lat, y.lon, x.lat, x.lon) <= 300); if(g) g.n++; else gs.push({lat: x.lat, lon: x.lon, n: 1}); }));
+        r.coords.forEach(c => { const g = gs.find(y => dist(y.lat, y.lon, c.lat, c.lon) <= 300); if(g) g.n++; else gs.push({lat: c.lat, lon: c.lon, n: 1}); });
+        const fortes = gs.filter(g => g.n >= 2).sort((a, b) => b.n - a.n);
+        if(fortes.length >= 2) r.avisos.push('A coordenada da tarja foi lida de formas diferentes: ' + fortes.slice(0, 3).map(g => fmt(g.lat) + ', ' + fmt(g.lon) + ' (' + g.n + ' leituras)').join(' | ') + '. Confira na foto qual é a certa' + (REGIAO ? '' : ' ou informe a coordenada de referência / cidade') + '.');
+      }
       r.ends.sort((x, y) => (y.voto || 0) - (x.voto || 0));
+      r.cidade = cidadeDoTexto((r.tarjaLimpa || '') + '\n' + r.textoTarja + '\n' + r.textoPagina);
     }
+    avaliarRegiao(r);
     return r;
   }
   /* texto editável: o texto da imagem + as linhas da tarja que ele não tem */
@@ -998,13 +1074,13 @@ progresso = function(){};   // sem barra de progresso do outro programa
     }
     // dados reconhecidos que não aparecem no texto (as várias leituras da tarja saíram diferentes) → no topo, marcados
     const c = melhorCoord(r), e = r.ends && r.ends[0], kt = K(t), extra = [];
-    if(e && !kt.includes(K(e.texto.split(' - ')[0]))) extra.push(e.texto);
+    if(e && !kt.includes(K(e.texto.split(' - ')[0]))) extra.push(e.texto + (r.cidade && !kt.includes(K(r.cidade.split(' - ')[0])) ? ', ' + r.cidade : ''));
     if(c && !kt.includes(String(Math.abs(c.lat).toFixed(4)).replace('.', ''))) extra.push(Math.abs(c.lat).toFixed(6) + '°' + (c.lat < 0 ? 'S' : 'N') + ', ' + Math.abs(c.lon).toFixed(6) + '°' + (c.lon < 0 ? 'W' : 'E'));
     if(r.data && !/\d{1,2}:\d{2}/.test(t)) extra.push(new Date(r.data).toLocaleString('pt-BR'));
     if(extra.length) t = '[reconhecido pelo programa]\n' + extra.join('\n') + (t ? '\n\n' + t : '');
     return t;
   }
-  const melhorCoord = r => r && r.coords.find(c => !/km da região/.test(c.nota)) || null;   // só a que cai na região; a de longe é “suspeita”
+  const melhorCoord = r => r && r.coords.find(c => !/km da refer/.test(c.nota)) || null;   // só a que cai na região; a de longe é “suspeita”
   const suspeita = r => r && !melhorCoord(r) && r.coords[0] || null;
   const temGeo = it => it.r && (melhorCoord(it.r) || it.r.ends.length);
   function desenhar(){
@@ -1019,10 +1095,11 @@ progresso = function(){};   // sem barra de progresso do outro programa
           r.avisos.map(a => '<div class="msg warn">' + esc(a) + '</div>').join('');
         if(c || e || sus){
           corpo += '<div class="geo"><div class="t">📍 Esta imagem tem ' + (c ? 'coordenada' : sus ? 'coordenada (suspeita)' : '') + ((c || sus) && e ? ' e ' : '') + (e ? 'endereço' : '') + '. Quer georreferenciar no Google Earth?</div>' +
-            '<div class="chave"><span class="k">Coordenada</span><span>' + (sus ? '<span class="pill warn">suspeita — confira na foto</span> ' + fmt(sus.lat) + ', ' + fmt(sus.lon) + ' <span class="ajuda">(' + esc(sus.fonte) + ' · ' + esc(sus.nota) + '; provavelmente um número lido errado. Não entra no KMZ.)</span>' : c ? '<b>' + fmt(c.lat) + ', ' + fmt(c.lon) + '</b> <span class="ajuda">(' + esc(c.fonte) + (c.nota ? ' · ' + esc(c.nota) : '') + ')</span> <button type="button" class="bt peq" data-copiar="' + fmt(c.lat) + ', ' + fmt(c.lon) + '">Copiar</button>' : '— <span class="ajuda">(sem coordenada: o Google Earth procura pelo endereço)</span>') + '</span>' +
+            '<div class="chave"><span class="k">Coordenada</span><span>' + (sus ? '<span class="pill warn">suspeita — confira na foto</span> ' + fmt(sus.lat) + ', ' + fmt(sus.lon) + ' <span class="ajuda">(' + esc(sus.fonte) + ' · ' + esc(sus.nota) + '. Não entra no KMZ.)</span>' : c ? '<b>' + fmt(c.lat) + ', ' + fmt(c.lon) + '</b> <span class="ajuda">(' + esc(c.fonte) + (c.nota ? ' · ' + esc(c.nota) : '') + ')</span> <button type="button" class="bt peq" data-copiar="' + fmt(c.lat) + ', ' + fmt(c.lon) + '">Copiar</button>' : '— <span class="ajuda">(sem coordenada: o Google Earth procura pelo endereço)</span>') + '</span>' +
             '<span class="k">Endereço</span><span>' + (e ? '<b>' + esc(e.texto) + '</b> <span class="ajuda">(' + esc(e.fonte) + ')</span>' : '—') + '</span>' +
+            (r.cidade ? '<span class="k">Cidade</span><span>' + esc(r.cidade) + ' <span class="ajuda">(lida na imagem)</span></span>' : '') +
             '<span class="k">Data</span><span>' + (r.data ? esc(new Date(r.data).toLocaleString('pt-BR')) + ' <span class="ajuda">(' + esc(r.dataFonte) + ')</span>' : '—') + '</span></div>' +
-            '<div class="linha">' + '<a class="bt peq" target="_blank" rel="noopener" href="https://earth.google.com/web/search/' + encodeURIComponent(c ? fmt(c.lat) + ',' + fmt(c.lon) : e ? e.texto + ', Rio das Ostras - RJ' : fmt(sus.lat) + ',' + fmt(sus.lon)) + '">🌍 Ver no Google Earth Web</a>' +
+            '<div class="linha">' + '<a class="bt peq" target="_blank" rel="noopener" href="https://earth.google.com/web/search/' + encodeURIComponent(c ? fmt(c.lat) + ',' + fmt(c.lon) : e ? e.texto + (r.cidade || $('ref-cidade').value.trim() ? ', ' + (r.cidade || $('ref-cidade').value.trim()) : '') : fmt(sus.lat) + ',' + fmt(sus.lon)) + '">🌍 Ver no Google Earth Web</a>' +
             (c ? '<label class="ajuda" style="margin:0;display:flex;gap:6px;align-items:center"><input type="checkbox" data-geo ' + (it.geo ? 'checked' : '') + '> incluir no KMZ</label>' : '<span class="ajuda" style="margin:0">Para entrar no KMZ precisa de coordenada (use o programa <a href="https://totalcivil.com.br/googleearth/" target="_blank" rel="noopener">Imagens GoogleEarth</a>, que acha o ponto pelo endereço).</span>') + '</div>' +
             ((r.coords.length + r.ends.length) > 2 ? '<details><summary>O que cada fonte achou</summary><table class="fontes"><tr><th>Fonte</th><th>Achou</th></tr>' +
               r.coords.map(x => '<tr><td>' + esc(x.fonte) + '</td><td>' + fmt(x.lat) + ', ' + fmt(x.lon) + (x.nota ? ' <span class="ajuda">(' + esc(x.nota) + ')</span>' : '') + '</td></tr>').join('') +
@@ -1043,16 +1120,33 @@ progresso = function(){};   // sem barra de progresso do outro programa
     $('bt-ler').disabled = true; $('bt-parar').hidden = false; prog(0);
     const t0 = Date.now(); let feitas = 0, erro = '';
     try{
+      REGIAO = null; LIMITE_KM = o.raio;
+      const cRef = o.coord ? (lerCoordenadas(o.coord) || (window.__geCoordsEspaco && window.__geCoordsEspaco(o.coord))) : null;
+      if(o.coord && !cRef) st('Não entendi a coordenada de referência “' + o.coord + '” (use, por exemplo, -22.527, -41.945).');
+      if(cRef) REGIAO = {lat: cRef.lat, lon: cRef.lon, nome: 'coordenada digitada, raio ' + LIMITE_KM + ' km', fonte: 'fixa'};
+      if(!REGIAO && o.geo && o.cidade){
+        st('Localizando a cidade “' + o.cidade + '”…');
+        const c = await regiaoDaCidade(o.cidade);
+        if(c) REGIAO = Object.assign({}, c, {nome: c.nome + ', raio ' + LIMITE_KM + ' km', fonte: 'fixa'}); else st('Não achei a cidade “' + o.cidade + '” no mapa; a região vai ser descoberta pelas fotos.');
+      }
+      if(!REGIAO) REGIAO = regiaoDasFotos() || (o.geo ? await regiaoPeloEndereco() : null);
+      mostrarRegiao();
       st('Carregando o leitor de texto… (na primeira vez baixa cerca de 10 MB)');
       await motorOCR();
       for(const it of fila){
         if(parar) break;
-        try{ it.r = await lerImagem(it.file, o); it.chave = chave; it.texto = textoInicial(it.r); }
+        if(!(REGIAO && REGIAO.fonte === 'fixa')){ REGIAO = regiaoDasFotos() || (o.geo ? await regiaoPeloEndereco() : null); mostrarRegiao(); }
+        try{ it.r = await lerImagem(it.file, o); it.chave = chave; it.texto = it.textoAuto = textoInicial(it.r); }
         catch(e){ console.error(e); it.r = {coords: [], ends: [], avisos: ['Erro ao ler: ' + (e.message || e)], textoPagina: '', textoTarja: '', confianca: 0}; it.texto = ''; if(/leitor de texto/.test(e.message || '')){ erro = e.message; break; } }
         feitas++; prog(feitas / fila.length); desenhar();
       }
     }catch(e){ erro = e.message || String(e); }
     finally{ rodando = false; $('bt-ler').disabled = !ITENS.length; $('bt-parar').hidden = true; prog(null); }
+    // região final do lote (mais fotos = mais certeza): reavalia todas; o texto só é refeito se você ainda não editou
+    if(!(REGIAO && REGIAO.fonte === 'fixa')) REGIAO = regiaoDasFotos() || (o.geo ? await regiaoPeloEndereco() : null);
+    mostrarRegiao();
+    ITENS.forEach(it => { if(!it.r) return; avaliarRegiao(it.r); if(it.texto === it.textoAuto){ it.texto = it.textoAuto = textoInicial(it.r); } });
+    desenhar();
     const geo = ITENS.filter(temGeo).length;
     st(erro ? 'Erro: ' + erro : (parar ? 'Parado. ' : '') + feitas + ' imagem(ns) lida(s) em ' + Math.round((Date.now() - t0) / 1000) + ' s.' + (geo ? ' ' + geo + ' com coordenada ou endereço: veja “Georreferenciar no Google Earth”.' : ''));
   }
@@ -1115,11 +1209,11 @@ progresso = function(){};   // sem barra de progresso do outro programa
     const ac = e.target.dataset.acao;
     if(ac === 'copiar') navigator.clipboard.writeText(it.texto).then(() => st('Texto copiado.'));
     if(ac === 'baixar') baixar(base(it.file.name) + '.txt', '﻿' + it.texto, 'text/plain;charset=utf-8');
-    if(ac === 'original' && it.r){ it.texto = textoInicial(it.r); desenhar(); }
+    if(ac === 'original' && it.r){ it.texto = it.textoAuto = textoInicial(it.r); desenhar(); }
     if(ac === 'remover' && !rodando){ URL.revokeObjectURL(it.url); ITENS.splice(ITENS.indexOf(it), 1); desenhar(); $('bt-ler').disabled = !ITENS.length; }
   });
   $('visor').onclick = () => { $('visor').hidden = true; };
-  window.__leitor = {ITENS, lerImagem, opcoes, consolidar};
+  window.__leitor = {ITENS, lerImagem, opcoes, consolidar, cidadeDoTexto, regiaoDasFotos, avaliarRegiao, get regiao(){ return REGIAO; }};
 })();
 </script>
 </body>
